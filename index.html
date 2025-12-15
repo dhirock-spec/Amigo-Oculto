@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#D42426" />
     <meta name="description" content="Site de Amigo Oculto da Galera do Paar" />
-    <link rel="manifest" href="/manifest.json" />
+    <!-- Caminho relativo (./) é crucial para GitHub Pages -->
+    <link rel="manifest" href="./manifest.json" />
     <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/625/625258.png" />
     <title>Amigo Oculto Galera do Paar</title>
     
@@ -70,5 +71,7 @@
 </head>
   <body>
     <div id="root"></div>
+    <!-- Adicionado script de entrada explicito para environments que não injetam automaticamente -->
+    <script type="module" src="./index.tsx"></script>
   </body>
 </html>
