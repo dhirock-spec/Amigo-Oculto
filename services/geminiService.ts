@@ -1,12 +1,24 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { GiftSuggestion } from "../types";
 
-const apiKey = process.env.API_KEY || '';
+// Safety check for process.env to avoid "process is not defined" in browser environments
+const getApiKey = () => {
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      return process.env.API_KEY || '';
+    }
+  } catch (e) {
+    // Ignore error if process is not accessible
+  }
+  return '';
+};
+
+const apiKey = getApiKey();
 const ai = new GoogleGenAI({ apiKey });
 
 export const generateGiftSuggestions = async (interests: string): Promise<GiftSuggestion[]> => {
   if (!apiKey) {
-    console.warn("No API Key provided");
+    console.warn("No API Key provided, returning mock data");
     return [
       { title: "Meias Confortáveis", description: "Meias de lã quentes para o inverno.", imagePrompt: "wool socks" },
       { title: "Kit de Chocolate Quente", description: "Mistura gourmet de cacau com marshmallows.", imagePrompt: "hot cocoa mug" },

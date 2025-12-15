@@ -4,6 +4,7 @@ import Snowfall from './components/Snowfall';
 import AddParticipantModal from './components/AddParticipantModal';
 import ParticipantCard from './components/ParticipantCard';
 import GiftDisplayModal from './components/GiftDisplayModal';
+import MusicPlayer from './components/MusicPlayer';
 import { Plus, CloudOff } from 'lucide-react';
 import { subscribeToParticipants, saveParticipantToDb, isFirebaseConfigured } from './services/firebase';
 
@@ -59,6 +60,7 @@ const App: React.FC = () => {
       <div className="fixed inset-0 bg-blue-950/60 pointer-events-none z-0" />
       
       <Snowfall />
+      <MusicPlayer />
       
       {/* Configuration Warning Banner */}
       {!isFirebaseConfigured && (
