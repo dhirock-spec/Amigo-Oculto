@@ -1,0 +1,16 @@
+{
+  "short_name": "Amigo Oculto",
+  "name": "Amigo Oculto Galera do Paar",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/625/625258.png",
+      "type": "image/png",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#D42426",
+  "background_color": "#FDFBF7",
+  "orientation": "portrait"
+}

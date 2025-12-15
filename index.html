@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#D42426" />
+    <meta name="description" content="App de Amigo Oculto da Galera do Paar" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/625/625258.png" />
+    <title>Amigo Oculto Galera do Paar</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@400;700&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              christmas: {
+                red: '#D42426',
+                green: '#165B33',
+                gold: '#F8B229',
+                cream: '#FDFBF7',
+                dark: '#0F172A'
+              }
+            },
+            fontFamily: {
+              sans: ['system-ui', 'sans-serif'],
+              serif: ['Georgia', 'serif'],
+              christmas: ['"Mountains of Christmas"', 'cursive'],
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      @keyframes float {
+        0% { transform: translateY(0px) translateX(0px); opacity: 0; }
+        10% { opacity: 1; }
+        100% { transform: translateY(100vh) translateX(20px); opacity: 0; }
+      }
+      .snowflake {
+        position: fixed;
+        top: -10px;
+        color: white;
+        animation: float linear infinite;
+        z-index: 0;
+        pointer-events: none;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
+    "framer-motion": "https://esm.sh/framer-motion@^12.23.26",
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js",
+    "firebase/": "https://esm.sh/firebase@^12.6.0/"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
