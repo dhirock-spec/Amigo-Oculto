@@ -4,7 +4,7 @@ import Snowfall from './components/Snowfall';
 import AddParticipantModal from './components/AddParticipantModal';
 import ParticipantCard from './components/ParticipantCard';
 import GiftDisplayModal from './components/GiftDisplayModal';
-import { Plus, CloudOff, Download } from 'lucide-react';
+import { Plus, CloudOff } from 'lucide-react';
 import { subscribeToParticipants, saveParticipantToDb, isFirebaseConfigured } from './services/firebase';
 
 const App: React.FC = () => {
@@ -12,7 +12,6 @@ const App: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | null>(null);
   const [editingParticipant, setEditingParticipant] = useState<Participant | undefined>(undefined);
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
 
   // Initial Load & Real-time Subscription
   useEffect(() => {
@@ -20,25 +19,8 @@ const App: React.FC = () => {
       setParticipants(data);
     });
 
-    // Listen for PWA install prompt
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-    });
-
     return () => unsubscribe();
   }, []);
-
-  const handleInstallClick = () => {
-    if (installPrompt) {
-      installPrompt.prompt();
-      installPrompt.userChoice.then((choiceResult: any) => {
-        if (choiceResult.outcome === 'accepted') {
-          setInstallPrompt(null);
-        }
-      });
-    }
-  };
 
   const handleSaveParticipant = async (p: Participant) => {
     await saveParticipantToDb(p);
@@ -82,7 +64,7 @@ const App: React.FC = () => {
       {!isFirebaseConfigured && (
         <div className="relative z-50 bg-amber-500/90 text-white text-center py-2 px-4 text-xs md:text-sm font-bold shadow-lg backdrop-blur-sm flex items-center justify-center gap-2">
           <CloudOff className="w-4 h-4" />
-          <span>Modo Offline: Configure o Firebase no arquivo 'services/firebase.ts' para sincronizar com todos.</span>
+          <span>Modo Local: Os dados estão salvos apenas no seu navegador. Configure o Firebase para sincronizar.</span>
         </div>
       )}
       
@@ -107,16 +89,6 @@ const App: React.FC = () => {
               <Plus className="w-6 h-6" />
               Entrar na Lista
             </button>
-
-            {installPrompt && (
-              <button 
-                onClick={handleInstallClick}
-                className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md text-white px-6 py-3 rounded-full font-bold text-lg border border-white/30 hover:bg-white/20 transition duration-200"
-              >
-                <Download className="w-6 h-6" />
-                Instalar App
-              </button>
-            )}
           </div>
         </div>
       </header>
