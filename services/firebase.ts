@@ -3,27 +3,20 @@ import { getFirestore, collection, onSnapshot, doc, setDoc } from 'firebase/fire
 import { Participant } from '../types';
 
 // ============================================================================
-// CONFIGURAÇÃO DO FIREBASE (IMPORTANTE: PREENCHA ISTO PARA FICAR ONLINE)
-// ============================================================================
-// 1. Vá para https://console.firebase.google.com/
-// 2. Crie um novo projeto
-// 3. Adicione um app Web
-// 4. Copie as configurações e substitua abaixo
-// 5. No Console do Firebase, vá em "Criação" -> "Firestore Database" -> "Criar banco de dados"
-// 6. Escolha iniciar no "Modo de teste" (para começar rápido)
+// CONFIGURAÇÃO DO FIREBASE (OBRIGATÓRIO PARA SINCRONIZAÇÃO ONLINE)
 // ============================================================================
 
 const firebaseConfig = {
-  // Substitua as strings vazias abaixo com suas chaves do Firebase
-  apiKey: "", 
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyA3pGzzEQvnasDlDSmsOnKrIEDXJfZ2WCc",
+  authDomain: "amigo-oculto-2025.firebaseapp.com",
+  projectId: "amigo-oculto-2025",
+  storageBucket: "amigo-oculto-2025.firebasestorage.app",
+  messagingSenderId: "636023943804",
+  appId: "1:636023943804:web:c622cdf647ba3870208ff9",
+  measurementId: "G-MHZ728NQL4"
 };
 
-// Check if config is filled
+// Verifica se as chaves foram preenchidas (ignora se estiverem vazias)
 export const isFirebaseConfigured = !!firebaseConfig.apiKey && firebaseConfig.apiKey !== "";
 
 let db: any;
@@ -32,42 +25,47 @@ if (isFirebaseConfigured) {
   try {
     const app = initializeApp(firebaseConfig);
     db = getFirestore(app);
-    console.log("Firebase conectado com sucesso!");
+    console.log("🟢 Firebase conectado com sucesso!");
   } catch (error) {
-    console.error("Erro ao inicializar Firebase:", error);
+    console.error("🔴 Erro ao inicializar Firebase:", error);
   }
+} else {
+  console.log("⚪ Firebase não configurado. O app funcionará apenas neste dispositivo.");
 }
 
-// Subscribe to real-time updates
+// Inscrever-se para atualizações em tempo real (Ouvir o banco de dados)
 export const subscribeToParticipants = (callback: (data: Participant[]) => void) => {
   if (!db) {
-    console.warn("Firebase não configurado. Usando armazenamento local.");
-    const stored = localStorage.getItem('north_pole_registry');
-    callback(stored ? JSON.parse(stored) : []);
-    
-    // Listen for storage events (other tabs)
-    const handleStorageChange = () => {
-       const updated = localStorage.getItem('north_pole_registry');
-       if (updated) callback(JSON.parse(updated));
+    // Modo Offline: Lê do LocalStorage
+    const loadFromLocal = () => {
+      const stored = localStorage.getItem('north_pole_registry');
+      callback(stored ? JSON.parse(stored) : []);
     };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    
+    loadFromLocal();
+    
+    // Escuta mudanças feitas em outras abas do mesmo navegador
+    window.addEventListener('storage', loadFromLocal);
+    return () => window.removeEventListener('storage', loadFromLocal);
   }
 
-  // Real-time listener from Firestore
+  // Modo Online: Escuta o Firestore em tempo real
+  // onSnapshot é o segredo: ele roda o callback sempre que ALGUÉM muda o banco
   return onSnapshot(collection(db, "participants"), (snapshot) => {
     const participants = snapshot.docs.map(doc => doc.data() as Participant);
+    // Ordena alfabeticamente opcionalmente, se desejar
+    // participants.sort((a, b) => a.name.localeCompare(b.name));
     callback(participants);
   }, (error) => {
-    console.error("Erro ao ler do Firestore:", error);
-    alert("Erro de conexão. Verifique se o Firestore está criado no modo de teste.");
+    console.error("Erro na conexão com Firestore:", error);
+    // Fallback silencioso para não quebrar a tela
   });
 };
 
-// Save or Update participant
+// Salvar ou Atualizar participante
 export const saveParticipantToDb = async (participant: Participant) => {
   if (!db) {
-    // Fallback to LocalStorage
+    // Modo Offline: Salva no LocalStorage
     const stored = localStorage.getItem('north_pole_registry');
     const participants = stored ? JSON.parse(stored) : [];
     
@@ -82,19 +80,19 @@ export const saveParticipantToDb = async (participant: Participant) => {
     }
     
     localStorage.setItem('north_pole_registry', JSON.stringify(newParticipants));
-    // Dispatch event for same-tab updates to catch it in the hook above isn't reliable for same-component,
-    // but the App component usually updates state optimistically or via callback re-fetch.
-    // We will return true to signal success.
+    // Dispara evento para atualizar outras abas
+    window.dispatchEvent(new Event('storage'));
     return true;
   }
 
   try {
-    // Save to Firestore "participants" collection with the ID as document key
+    // Modo Online: Salva no Firestore
+    // setDoc com merge:true é mais seguro, mas aqui sobrescrevemos pelo ID, o que é ok
     await setDoc(doc(db, "participants", participant.id), participant);
     return true;
   } catch (error) {
     console.error("Erro ao salvar no Firestore:", error);
-    alert("Falha ao salvar online. Verifique as permissões do banco de dados.");
+    alert("Erro ao salvar online. Verifique se as regras de segurança do Firestore permitem gravação.");
     return false;
   }
 };

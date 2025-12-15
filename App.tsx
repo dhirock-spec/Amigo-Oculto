@@ -5,13 +5,16 @@ import AddParticipantModal from './components/AddParticipantModal';
 import ParticipantCard from './components/ParticipantCard';
 import GiftDisplayModal from './components/GiftDisplayModal';
 import MusicPlayer from './components/MusicPlayer';
-import { Plus, CloudOff } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { subscribeToParticipants, saveParticipantToDb, isFirebaseConfigured } from './services/firebase';
 
 const App: React.FC = () => {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [selectedParticipant, setSelectedParticipant] = useState<Participant | null>(null);
+  
+  // Agora armazenamos apenas o ID para garantir que o modal sempre mostre
+  // a versão mais recente dos dados vinda do banco de dados (tempo real)
+  const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null);
   const [editingParticipant, setEditingParticipant] = useState<Participant | undefined>(undefined);
 
   // Initial Load & Real-time Subscription
@@ -24,8 +27,10 @@ const App: React.FC = () => {
   }, []);
 
   const handleSaveParticipant = async (p: Participant) => {
+    // 1. Salva no banco (ou local storage)
     await saveParticipantToDb(p);
     
+    // 2. Se estiver offline, atualiza a interface manualmente para parecer instantâneo
     if (!isFirebaseConfigured) {
        setParticipants(prev => {
           const idx = prev.findIndex(x => x.id === p.id);
@@ -43,15 +48,18 @@ const App: React.FC = () => {
   };
 
   const handleStartEditing = (participant: Participant) => {
-    setSelectedParticipant(null); // Close display modal
-    setEditingParticipant(participant); // Set data for edit modal
-    setIsAddModalOpen(true); // Open edit modal
+    setSelectedParticipantId(null); // Fecha o modal de visualização
+    setEditingParticipant(participant); // Prepara dados para edição
+    setIsAddModalOpen(true); // Abre modal de edição
   };
 
   const handleCloseModal = () => {
     setIsAddModalOpen(false);
     setEditingParticipant(undefined);
   };
+
+  // Deriva o participante ativo baseado no ID selecionado e na lista atualizada
+  const activeParticipant = participants.find(p => p.id === selectedParticipantId) || null;
 
   return (
     <div className="min-h-screen bg-[url('https://images.unsplash.com/photo-1534796636912-3b95b3ab5980?auto=format&fit=crop&q=80')] bg-cover bg-center bg-fixed text-slate-800 font-sans relative overflow-x-hidden">
@@ -61,14 +69,6 @@ const App: React.FC = () => {
       
       <Snowfall />
       <MusicPlayer />
-      
-      {/* Configuration Warning Banner */}
-      {!isFirebaseConfigured && (
-        <div className="relative z-50 bg-amber-500/90 text-white text-center py-2 px-4 text-xs md:text-sm font-bold shadow-lg backdrop-blur-sm flex items-center justify-center gap-2">
-          <CloudOff className="w-4 h-4" />
-          <span>Modo Local: Os dados estão salvos apenas no seu navegador. Configure o Firebase para sincronizar.</span>
-        </div>
-      )}
       
       {/* Hero Header */}
       <header className="relative z-10 pt-20 pb-12 px-4 text-center">
@@ -109,7 +109,7 @@ const App: React.FC = () => {
               <ParticipantCard 
                 key={p.id} 
                 participant={p} 
-                onClick={() => setSelectedParticipant(p)} 
+                onClick={() => setSelectedParticipantId(p.id)} 
               />
             ))}
           </div>
@@ -120,6 +120,9 @@ const App: React.FC = () => {
       {/* Footer */}
       <footer className="relative z-10 py-8 text-center text-white/60 text-sm font-christmas text-lg">
         <p>© {new Date().getFullYear()} Galera do Paar. Desenvolvido por Diogenes Araujo.</p>
+        <p className="text-xs mt-2 opacity-50">
+          {isFirebaseConfigured ? "🟢 Conectado ao Polo Norte" : "⚪ Modo Offline (Configure o Firebase para sincronizar)"}
+        </p>
       </footer>
 
       {/* Modals */}
@@ -132,10 +135,10 @@ const App: React.FC = () => {
         />
       )}
 
-      {selectedParticipant && (
+      {activeParticipant && (
         <GiftDisplayModal 
-          participant={selectedParticipant} 
-          onClose={() => setSelectedParticipant(null)}
+          participant={activeParticipant} 
+          onClose={() => setSelectedParticipantId(null)}
           onEdit={handleStartEditing}
         />
       )}
