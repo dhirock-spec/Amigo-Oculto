@@ -75,8 +75,8 @@ const App: React.FC = () => {
         <div className="max-w-4xl mx-auto flex flex-col items-center">
           
           <img 
-            src="https://cdn-icons-png.flaticon.com/512/1651/1651586.png" 
-            alt="Papai Noel Paar" 
+            src="https://cdn-icons-png.flaticon.com/512/3662/3662584.png" 
+            alt="Presente de Natal" 
             className="w-32 h-32 mb-6 drop-shadow-[0_0_20px_rgba(255,255,255,0.4)] hover:scale-110 transition duration-300"
           />
 
