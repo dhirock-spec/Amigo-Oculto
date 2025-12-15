@@ -72,7 +72,14 @@ const App: React.FC = () => {
       
       {/* Hero Header */}
       <header className="relative z-10 pt-20 pb-12 px-4 text-center">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-4xl mx-auto flex flex-col items-center">
+          
+          <img 
+            src="https://cdn-icons-png.flaticon.com/512/1651/1651586.png" 
+            alt="Papai Noel Paar" 
+            className="w-32 h-32 mb-6 drop-shadow-[0_0_20px_rgba(255,255,255,0.4)] hover:scale-110 transition duration-300"
+          />
+
           <h1 className="text-6xl md:text-8xl font-christmas font-bold mb-4 drop-shadow-[0_0_15px_rgba(255,215,0,0.6)] text-christmas-gold animate-pulse">
             Amigo Oculto Galera do Paar
           </h1>
