@@ -4,7 +4,6 @@ import Snowfall from './components/Snowfall';
 import AddParticipantModal from './components/AddParticipantModal';
 import ParticipantCard from './components/ParticipantCard';
 import GiftDisplayModal from './components/GiftDisplayModal';
-import MusicPlayer from './components/MusicPlayer';
 import { Plus } from 'lucide-react';
 import { subscribeToParticipants, saveParticipantToDb, isFirebaseConfigured } from './services/firebase';
 
@@ -68,7 +67,6 @@ const App: React.FC = () => {
       <div className="fixed inset-0 bg-blue-950/60 pointer-events-none z-0" />
       
       <Snowfall />
-      <MusicPlayer />
       
       {/* Hero Header */}
       <header className="relative z-10 pt-20 pb-12 px-4 text-center">

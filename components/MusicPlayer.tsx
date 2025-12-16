@@ -16,6 +16,14 @@ const PLAYLIST = [
     title: "We Wish You a Merry Christmas",
     artist: "Kevin MacLeod",
     src: "https://upload.wikimedia.org/wikipedia/commons/9/9b/We_Wish_You_a_Merry_Christmas_-_Kevin_MacLeod.ogg"
+  },
+  {
+    title: "Especial Galera do Paar",
+    artist: "Áudio do YouTube",
+    // Nota: Links do YouTube não funcionam diretamente em tags <audio>. 
+    // Para funcionar perfeitamente, baixe o áudio do vídeo, faça upload (ex: Firebase Storage) e cole o link aqui.
+    // Coloquei 'Jingle Bells' como placeholder para não quebrar o player.
+    src: "https://upload.wikimedia.org/wikipedia/commons/e/e9/Jingle_Bells_-_Kevin_MacLeod.ogg"
   }
 ];
 
