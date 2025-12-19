@@ -69,7 +69,7 @@ const App: React.FC = () => {
             className="w-20 h-20 mb-2 drop-shadow-xl"
           />
           <h1 className="text-4xl md:text-6xl font-christmas font-bold text-christmas-gold drop-shadow-lg">
-            Paar Noel 2024
+            Amigo oculto Paar
           </h1>
         </button>
       </header>
