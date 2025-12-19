@@ -64,11 +64,12 @@ const App: React.FC = () => {
           className="mx-auto flex flex-col items-center hover:scale-105 transition duration-300"
         >
           <img 
-            src="https://cdn-icons-png.flaticon.com/512/3662/3662584.png" 
-            alt="Logo" 
-            className="w-20 h-20 mb-2 drop-shadow-xl"
+            src="https://cdn-icons-png.flaticon.com/512/4605/4605151.png" 
+            alt="Papai Noel Cool" 
+            className="w-24 h-24 mb-2 drop-shadow-2xl animate-bounce"
+            style={{ animationDuration: '3s' }}
           />
-          <h1 className="text-4xl md:text-6xl font-christmas font-bold text-christmas-gold drop-shadow-lg">
+          <h1 className="text-4xl md:text-6xl font-christmas font-bold text-christmas-gold drop-shadow-lg animate-christmas-text">
             Amigo oculto Paar
           </h1>
         </button>
@@ -87,7 +88,7 @@ const App: React.FC = () => {
                 <Gift className="w-16 h-16 text-christmas-gold" />
               </div>
               <div className="text-center">
-                <h2 className="text-3xl font-christmas font-bold mb-2">Amigo Oculto</h2>
+                <h2 className="text-3xl font-christmas font-bold mb-2 animate-sway-only">Amigo Oculto</h2>
                 <p className="opacity-80 font-medium">Veja quem está na lista e o que querem ganhar!</p>
               </div>
             </button>
@@ -100,7 +101,7 @@ const App: React.FC = () => {
                 <Utensils className="w-16 h-16 text-christmas-gold" />
               </div>
               <div className="text-center">
-                <h2 className="text-3xl font-christmas font-bold mb-2">Ceia da Galera</h2>
+                <h2 className="text-3xl font-christmas font-bold mb-2 animate-sway-only">Ceia da Galera</h2>
                 <p className="opacity-80 font-medium">O que vamos comer? Escolha seu prato (não vale repetir!)</p>
               </div>
             </button>
@@ -124,7 +125,7 @@ const App: React.FC = () => {
             
             {participants.length === 0 ? (
               <div className="bg-white/10 backdrop-blur-md rounded-xl p-12 text-center text-white border border-white/20 max-w-2xl mx-auto">
-                <p className="text-3xl font-christmas mb-2">Ninguém chegou ainda...</p>
+                <p className="text-3xl font-christmas mb-2 animate-christmas-text">Ninguém chegou ainda...</p>
                 <p>Seja o primeiro a pedir seu presente!</p>
               </div>
             ) : (
@@ -145,7 +146,7 @@ const App: React.FC = () => {
                 <ChevronLeft /> Voltar ao Menu
               </button>
               <div className="text-center hidden md:block">
-                <h2 className="text-white font-christmas text-3xl">Ceia da Galera</h2>
+                <h2 className="text-white font-christmas text-3xl animate-christmas-text">Ceia da Galera</h2>
                 <p className="text-christmas-gold text-xs font-bold uppercase">Clique em um prato para editar ou trocar</p>
               </div>
               <button 
@@ -159,7 +160,7 @@ const App: React.FC = () => {
             {foodItems.length === 0 ? (
               <div className="bg-white/10 backdrop-blur-md rounded-xl p-12 text-center text-white border border-white/20 max-w-2xl mx-auto">
                 <Utensils className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                <p className="text-3xl font-christmas mb-2">A mesa está vazia!</p>
+                <p className="text-3xl font-christmas mb-2 animate-christmas-text">A mesa está vazia!</p>
                 <p>O que você vai preparar para a galera do Paar?</p>
               </div>
             ) : (
@@ -179,7 +180,7 @@ const App: React.FC = () => {
                       <div className="aspect-video relative overflow-hidden">
                         <img src={f.image} className="w-full h-full object-cover transition duration-700 group-hover:scale-110" />
                         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-4 text-white">
-                          <h3 className="text-2xl font-christmas font-bold drop-shadow-md">{f.name}</h3>
+                          <h3 className="text-2xl font-christmas font-bold drop-shadow-md animate-sway-only">{f.name}</h3>
                         </div>
                       </div>
 
@@ -209,7 +210,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="relative z-10 py-8 text-center text-white/60 text-sm font-christmas text-lg">
-        <p>© {new Date().getFullYear()} Galera do Paar. Desenvolvido por Diogenes Araujo.</p>
+        <p className="animate-sway-only">© {new Date().getFullYear()} Galera do Paar. Desenvolvido por Diogenes Araujo.</p>
         <p className="text-xs mt-2 opacity-50">
           {isFirebaseConfigured ? "🟢 Conectado ao Polo Norte" : "⚪ Modo Local (Offline)"}
         </p>

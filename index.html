@@ -7,7 +7,7 @@
     <meta name="description" content="Site de Amigo Oculto da Galera do Paar" />
     <!-- Caminho relativo (./) é crucial para GitHub Pages -->
     <link rel="manifest" href="./manifest.json" />
-    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/3662/3662584.png" />
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/4605/4605151.png" />
     <title>Amigo Oculto Galera do Paar</title>
     
     <!-- Google Fonts -->
@@ -44,6 +44,17 @@
         10% { opacity: 1; }
         100% { transform: translateY(100vh) translateX(20px); opacity: 0; }
       }
+      
+      @keyframes christmas-sway {
+        0%, 100% { transform: rotate(-1.5deg); }
+        50% { transform: rotate(1.5deg); }
+      }
+
+      @keyframes christmas-glow {
+        0%, 100% { text-shadow: 0 0 10px #F8B229, 0 0 20px #F8B229; }
+        50% { text-shadow: 0 0 5px #fff, 0 0 10px #F8B229, 0 0 15px #F8B229; }
+      }
+
       .snowflake {
         position: fixed;
         top: -10px;
@@ -51,6 +62,16 @@
         animation: float linear infinite;
         z-index: 0;
         pointer-events: none;
+      }
+
+      .animate-christmas-text {
+        animation: christmas-sway 3s ease-in-out infinite, christmas-glow 2s ease-in-out infinite;
+        display: inline-block;
+      }
+
+      .animate-sway-only {
+        animation: christmas-sway 4s ease-in-out infinite;
+        display: inline-block;
       }
     </style>
   <script type="importmap">
