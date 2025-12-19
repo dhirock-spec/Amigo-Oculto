@@ -23,4 +23,10 @@ export interface FoodItem {
   contributorAvatar: string;
 }
 
+export interface Vote {
+  id: string; // Participant ID who is voting
+  voterName: string;
+  guessName: string;
+}
+
 export type GiftSuggestion = Omit<Gift, 'id' | 'image'> & { imagePrompt: string };

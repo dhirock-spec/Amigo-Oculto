@@ -1,25 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { Participant, FoodItem } from './types';
+import { Participant, FoodItem, Vote } from './types';
 import Snowfall from './components/Snowfall';
 import AddParticipantModal from './components/AddParticipantModal';
 import AddFoodModal from './components/AddFoodModal';
 import ParticipantCard from './components/ParticipantCard';
 import GiftDisplayModal from './components/GiftDisplayModal';
-import { Plus, Gift, Utensils, ChevronLeft, Pencil, Sparkles } from 'lucide-react';
+import { Plus, Gift, Utensils, ChevronLeft, Pencil, Sparkles, HelpCircle, CheckCircle2, UserCheck } from 'lucide-react';
 import { 
   subscribeToParticipants, 
   saveParticipantToDb, 
   subscribeToFood, 
   saveFoodToDb, 
+  subscribeToVotes,
+  saveVoteToDb,
   isFirebaseConfigured 
 } from './services/firebase';
 
-type ViewMode = 'menu' | 'gifts' | 'food';
+type ViewMode = 'menu' | 'gifts' | 'food' | 'quiz';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewMode>('menu');
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
+  const [votes, setVotes] = useState<Vote[]>([]);
   
   const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
   const [isAddFoodOpen, setIsAddFoodOpen] = useState(false);
@@ -28,12 +31,19 @@ const App: React.FC = () => {
   const [editingParticipant, setEditingParticipant] = useState<Participant | undefined>(undefined);
   const [editingFood, setEditingFood] = useState<FoodItem | undefined>(undefined);
 
+  // Quiz States
+  const [voterId, setVoterId] = useState('');
+  const [guessName, setGuessName] = useState('');
+  const [isVoting, setIsVoting] = useState(false);
+
   useEffect(() => {
     const unsubParticipants = subscribeToParticipants(setParticipants);
     const unsubFood = subscribeToFood(setFoodItems);
+    const unsubVotes = subscribeToVotes(setVotes);
     return () => {
       unsubParticipants();
       unsubFood();
+      unsubVotes();
     };
   }, []);
 
@@ -49,7 +59,31 @@ const App: React.FC = () => {
     setEditingFood(undefined);
   };
 
+  const handleCastVote = async () => {
+    if (!voterId || !guessName) return;
+    
+    const voter = participants.find(p => p.id === voterId);
+    if (!voter) return;
+
+    setIsVoting(true);
+    const newVote: Vote = {
+      id: voterId,
+      voterName: voter.name,
+      guessName: guessName
+    };
+
+    const success = await saveVoteToDb(newVote);
+    if (!success) {
+      alert("Você já votou!");
+    }
+    
+    setIsVoting(false);
+    setVoterId('');
+    setGuessName('');
+  };
+
   const activeParticipant = participants.find(p => p.id === selectedParticipantId) || null;
+  const hasVoted = (id: string) => votes.some(v => v.id === id);
 
   return (
     <div className="min-h-screen bg-[url('https://images.unsplash.com/photo-1534796636912-3b95b3ab5980?auto=format&fit=crop&q=80')] bg-cover bg-center bg-fixed text-slate-800 font-sans relative overflow-x-hidden">
@@ -79,7 +113,7 @@ const App: React.FC = () => {
         
         {/* VIEW: MENU DE ENTRADA */}
         {view === 'menu' && (
-          <div className="flex flex-col md:flex-row gap-8 justify-center items-stretch mt-12 max-w-4xl mx-auto">
+          <div className="flex flex-col md:flex-row gap-8 justify-center items-stretch mt-12 max-w-6xl mx-auto">
             <button 
               onClick={() => setView('gifts')}
               className="flex-1 bg-christmas-red hover:bg-red-700 text-white p-8 rounded-3xl shadow-2xl border-4 border-christmas-gold transform hover:-translate-y-2 transition-all flex flex-col items-center gap-6 group"
@@ -103,6 +137,19 @@ const App: React.FC = () => {
               <div className="text-center">
                 <h2 className="text-3xl font-christmas font-bold mb-2 animate-sway-only">Ceia da Galera</h2>
                 <p className="opacity-80 font-medium">O que vamos comer? Escolha seu prato (não vale repetir!)</p>
+              </div>
+            </button>
+
+            <button 
+              onClick={() => setView('quiz')}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-8 rounded-3xl shadow-2xl border-4 border-christmas-gold transform hover:-translate-y-2 transition-all flex flex-col items-center gap-6 group"
+            >
+              <div className="bg-white/20 p-6 rounded-full group-hover:scale-110 transition">
+                <HelpCircle className="w-16 h-16 text-christmas-gold" />
+              </div>
+              <div className="text-center">
+                <h2 className="text-3xl font-christmas font-bold mb-2 animate-sway-only">Quiz Palpite</h2>
+                <p className="opacity-80 font-medium">Quem você acha que tirou seu nome? Dê seu palpite!</p>
               </div>
             </button>
           </div>
@@ -204,6 +251,104 @@ const App: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* VIEW: QUIZ */}
+        {view === 'quiz' && (
+          <div className="space-y-8 animate-in fade-in duration-500 max-w-4xl mx-auto">
+            <div className="flex justify-between items-center bg-black/40 p-4 rounded-2xl backdrop-blur-lg border border-white/20">
+              <button onClick={() => setView('menu')} className="text-white flex items-center gap-2 font-christmas text-xl hover:text-christmas-gold transition">
+                <ChevronLeft /> Voltar ao Menu
+              </button>
+              <h2 className="text-white font-christmas text-3xl animate-christmas-text hidden md:block">Quem tirou você?</h2>
+              <div className="w-32"></div> {/* Spacer */}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Vote Form */}
+              <div className="bg-white rounded-3xl p-8 shadow-2xl border-b-8 border-blue-600">
+                <h3 className="text-2xl font-christmas font-bold text-christmas-dark mb-6 flex items-center gap-2">
+                  <UserCheck className="text-blue-600" />
+                  Dê o seu Palpite
+                </h3>
+                
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-black text-gray-500 uppercase tracking-widest mb-2">Quem é você?</label>
+                    <select 
+                      value={voterId}
+                      onChange={(e) => setVoterId(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 bg-slate-50 text-gray-900 font-bold focus:border-blue-500 outline-none transition"
+                    >
+                      <option value="">Selecione seu nome</option>
+                      {participants.map(p => (
+                        <option key={p.id} value={p.id} disabled={hasVoted(p.id)}>
+                          {p.name} {hasVoted(p.id) ? ' (Já votou)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-black text-gray-500 uppercase tracking-widest mb-2">Quem você acha que tirou seu nome?</label>
+                    <select 
+                      value={guessName}
+                      onChange={(e) => setGuessName(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 bg-slate-50 text-gray-900 font-bold focus:border-blue-500 outline-none transition"
+                    >
+                      <option value="">Selecione um palpite</option>
+                      {participants
+                        .filter(p => p.id !== voterId)
+                        .map(p => (
+                          <option key={p.id} value={p.name}>{p.name}</option>
+                        ))
+                      }
+                    </select>
+                  </div>
+
+                  <button 
+                    onClick={handleCastVote}
+                    disabled={!voterId || !guessName || isVoting}
+                    className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-black text-xl rounded-2xl shadow-lg transform active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-3 uppercase"
+                  >
+                    {isVoting ? <Sparkles className="animate-spin" /> : "Votar agora!"}
+                  </button>
+                  <p className="text-[10px] text-center text-gray-400 font-bold uppercase tracking-widest italic">
+                    Somente um voto por pessoa. Visível para todos!
+                  </p>
+                </div>
+              </div>
+
+              {/* Results */}
+              <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 text-white shadow-2xl h-fit">
+                <h3 className="text-2xl font-christmas font-bold mb-6 flex items-center gap-2">
+                  <CheckCircle2 className="text-christmas-gold" />
+                  Palpites da Galera
+                </h3>
+                
+                {votes.length === 0 ? (
+                  <div className="text-center py-12 opacity-50 italic">
+                    Ainda não temos palpites... Seja o primeiro!
+                  </div>
+                ) : (
+                  <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                    {votes.map((v, i) => (
+                      <div key={i} className="bg-white/10 p-4 rounded-xl flex items-center justify-between border-l-4 border-christmas-gold group hover:bg-white/20 transition">
+                        <div>
+                          <span className="text-christmas-gold font-bold text-sm block uppercase tracking-tighter">O palpite de:</span>
+                          <span className="font-christmas text-xl">{v.voterName}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-white/60 font-bold text-[10px] block uppercase tracking-tighter">Acha que foi tirado por:</span>
+                          <span className="font-christmas text-xl text-blue-300">{v.guessName}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 

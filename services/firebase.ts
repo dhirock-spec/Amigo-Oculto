@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
-import { Participant, FoodItem } from '../types';
+import { Participant, FoodItem, Vote } from '../types';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA3pGzzEQvnasDlDSmsOnKrIEDXJfZ2WCc",
@@ -86,5 +86,37 @@ export const saveFoodToDb = async (food: FoodItem) => {
     return true;
   }
   await setDoc(doc(db, "food", food.id), food);
+  return true;
+};
+
+// --- QUIZ / VOTOS ---
+export const subscribeToVotes = (callback: (data: Vote[]) => void) => {
+  if (!db) {
+    const loadFromLocal = () => {
+      const stored = localStorage.getItem('paar_quiz_votes');
+      callback(stored ? JSON.parse(stored) : []);
+    };
+    loadFromLocal();
+    window.addEventListener('storage', loadFromLocal);
+    return () => window.removeEventListener('storage', loadFromLocal);
+  }
+
+  return onSnapshot(collection(db, "votes"), (snapshot) => {
+    const votes = snapshot.docs.map(doc => doc.data() as Vote);
+    callback(votes);
+  });
+};
+
+export const saveVoteToDb = async (vote: Vote) => {
+  if (!db) {
+    const stored = localStorage.getItem('paar_quiz_votes');
+    const votes = stored ? JSON.parse(stored) : [];
+    const index = votes.findIndex((v: Vote) => v.id === vote.id);
+    if (index >= 0) return false; // Already voted locally
+    localStorage.setItem('paar_quiz_votes', JSON.stringify([...votes, vote]));
+    window.dispatchEvent(new Event('storage'));
+    return true;
+  }
+  await setDoc(doc(db, "votes", vote.id), vote);
   return true;
 };
