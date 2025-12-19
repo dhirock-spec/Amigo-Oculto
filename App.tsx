@@ -5,7 +5,7 @@ import AddParticipantModal from './components/AddParticipantModal';
 import AddFoodModal from './components/AddFoodModal';
 import ParticipantCard from './components/ParticipantCard';
 import GiftDisplayModal from './components/GiftDisplayModal';
-import { Plus, Gift, Utensils, ChevronLeft, Pencil, Sparkles, HelpCircle, CheckCircle2, UserCheck } from 'lucide-react';
+import { Plus, Gift, Utensils, ChevronLeft, Pencil, Sparkles, HelpCircle, CheckCircle2, UserCheck, AlertCircle, Trash2 } from 'lucide-react';
 import { 
   subscribeToParticipants, 
   saveParticipantToDb, 
@@ -13,6 +13,7 @@ import {
   saveFoodToDb, 
   subscribeToVotes,
   saveVoteToDb,
+  deleteVoteFromDb,
   isFirebaseConfigured 
 } from './services/firebase';
 
@@ -85,6 +86,16 @@ const App: React.FC = () => {
     setVoterId(vote.id);
     setGuessId(vote.guessId);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDeleteVote = async (voteId: string) => {
+    if (confirm('Tem certeza que deseja excluir seu palpite?')) {
+      await deleteVoteFromDb(voteId);
+      if (voterId === voteId) {
+        setVoterId('');
+        setGuessId('');
+      }
+    }
   };
 
   const activeParticipant = participants.find(p => p.id === selectedParticipantId) || null;
@@ -285,8 +296,9 @@ const App: React.FC = () => {
                     <select 
                       value={voterId}
                       onChange={(e) => {
-                        setVoterId(e.target.value);
-                        const v = votes.find(v => v.id === e.target.value);
+                        const newVoterId = e.target.value;
+                        setVoterId(newVoterId);
+                        const v = votes.find(v => v.id === newVoterId);
                         if (v) setGuessId(v.guessId);
                         else setGuessId('');
                       }}
@@ -306,16 +318,22 @@ const App: React.FC = () => {
                     <select 
                       value={guessId}
                       onChange={(e) => setGuessId(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 bg-slate-50 text-gray-900 font-bold focus:border-blue-500 outline-none transition"
+                      disabled={!voterId}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 bg-slate-50 text-gray-900 font-bold focus:border-blue-500 outline-none transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <option value="">Selecione um palpite</option>
+                      <option value="">{voterId ? 'Selecione um palpite' : 'Selecione quem você é primeiro'}</option>
                       {participants
-                        .filter(p => p.id !== voterId)
+                        .filter(p => p.id !== voterId) // NUNCA permite selecionar a si mesmo
                         .map(p => (
                           <option key={p.id} value={p.id}>{p.name}</option>
                         ))
                       }
                     </select>
+                    {voterId && (
+                      <p className="mt-2 text-[10px] text-blue-600 font-bold flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" /> Note: Você não pode selecionar a si mesmo.
+                      </p>
+                    )}
                   </div>
 
                   <button 
@@ -368,13 +386,22 @@ const App: React.FC = () => {
                             <div className="w-10 h-10 rounded-full border-2 border-blue-400 overflow-hidden bg-white shrink-0">
                                {guessed?.avatar ? <img src={guessed.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">?</div>}
                             </div>
-                            <button 
-                              onClick={() => handleEditVote(v)}
-                              className="p-1.5 bg-white/20 hover:bg-white/40 rounded-full transition opacity-0 group-hover:opacity-100 ml-1"
-                              title="Editar este palpite"
-                            >
-                              <Pencil className="w-3.5 h-3.5 text-white" />
-                            </button>
+                            <div className="flex flex-col gap-1 ml-1 shrink-0 opacity-0 group-hover:opacity-100 transition">
+                              <button 
+                                onClick={() => handleEditVote(v)}
+                                className="p-1.5 bg-white/20 hover:bg-white/40 rounded-full transition"
+                                title="Editar este palpite"
+                              >
+                                <Pencil className="w-3 h-3 text-white" />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteVote(v.id)}
+                                className="p-1.5 bg-red-500/30 hover:bg-red-500 rounded-full transition"
+                                title="Excluir este palpite"
+                              >
+                                <Trash2 className="w-3 h-3 text-white" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       );

@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { Participant, FoodItem, Vote } from '../types';
 
 const firebaseConfig = {
@@ -124,5 +124,18 @@ export const saveVoteToDb = async (vote: Vote) => {
     return true;
   }
   await setDoc(doc(db, "votes", vote.id), vote);
+  return true;
+};
+
+export const deleteVoteFromDb = async (voteId: string) => {
+  if (!db) {
+    const stored = localStorage.getItem('paar_quiz_votes');
+    let votes = stored ? JSON.parse(stored) : [];
+    const filteredVotes = votes.filter((v: Vote) => v.id !== voteId);
+    localStorage.setItem('paar_quiz_votes', JSON.stringify(filteredVotes));
+    window.dispatchEvent(new Event('storage'));
+    return true;
+  }
+  await deleteDoc(doc(db, "votes", voteId));
   return true;
 };
