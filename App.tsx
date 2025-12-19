@@ -33,7 +33,7 @@ const App: React.FC = () => {
 
   // Quiz States
   const [voterId, setVoterId] = useState('');
-  const [guessName, setGuessName] = useState('');
+  const [guessId, setGuessId] = useState('');
   const [isVoting, setIsVoting] = useState(false);
 
   useEffect(() => {
@@ -60,30 +60,36 @@ const App: React.FC = () => {
   };
 
   const handleCastVote = async () => {
-    if (!voterId || !guessName) return;
+    if (!voterId || !guessId) return;
     
     const voter = participants.find(p => p.id === voterId);
-    if (!voter) return;
+    const guessed = participants.find(p => p.id === guessId);
+    if (!voter || !guessed) return;
 
     setIsVoting(true);
     const newVote: Vote = {
       id: voterId,
       voterName: voter.name,
-      guessName: guessName
+      guessId: guessId,
+      guessName: guessed.name
     };
 
-    const success = await saveVoteToDb(newVote);
-    if (!success) {
-      alert("Você já votou!");
-    }
+    await saveVoteToDb(newVote);
     
     setIsVoting(false);
     setVoterId('');
-    setGuessName('');
+    setGuessId('');
+  };
+
+  const handleEditVote = (vote: Vote) => {
+    setVoterId(vote.id);
+    setGuessId(vote.guessId);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const activeParticipant = participants.find(p => p.id === selectedParticipantId) || null;
   const hasVoted = (id: string) => votes.some(v => v.id === id);
+  const existingVote = votes.find(v => v.id === voterId);
 
   return (
     <div className="min-h-screen bg-[url('https://images.unsplash.com/photo-1534796636912-3b95b3ab5980?auto=format&fit=crop&q=80')] bg-cover bg-center bg-fixed text-slate-800 font-sans relative overflow-x-hidden">
@@ -270,7 +276,7 @@ const App: React.FC = () => {
               <div className="bg-white rounded-3xl p-8 shadow-2xl border-b-8 border-blue-600">
                 <h3 className="text-2xl font-christmas font-bold text-christmas-dark mb-6 flex items-center gap-2">
                   <UserCheck className="text-blue-600" />
-                  Dê o seu Palpite
+                  {existingVote ? 'Atualizar seu Palpite' : 'Dê o seu Palpite'}
                 </h3>
                 
                 <div className="space-y-6">
@@ -278,13 +284,18 @@ const App: React.FC = () => {
                     <label className="block text-sm font-black text-gray-500 uppercase tracking-widest mb-2">Quem é você?</label>
                     <select 
                       value={voterId}
-                      onChange={(e) => setVoterId(e.target.value)}
+                      onChange={(e) => {
+                        setVoterId(e.target.value);
+                        const v = votes.find(v => v.id === e.target.value);
+                        if (v) setGuessId(v.guessId);
+                        else setGuessId('');
+                      }}
                       className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 bg-slate-50 text-gray-900 font-bold focus:border-blue-500 outline-none transition"
                     >
                       <option value="">Selecione seu nome</option>
                       {participants.map(p => (
-                        <option key={p.id} value={p.id} disabled={hasVoted(p.id)}>
-                          {p.name} {hasVoted(p.id) ? ' (Já votou)' : ''}
+                        <option key={p.id} value={p.id}>
+                          {p.name} {hasVoted(p.id) ? ' (Já palpitou)' : ''}
                         </option>
                       ))}
                     </select>
@@ -293,15 +304,15 @@ const App: React.FC = () => {
                   <div>
                     <label className="block text-sm font-black text-gray-500 uppercase tracking-widest mb-2">Quem você acha que tirou seu nome?</label>
                     <select 
-                      value={guessName}
-                      onChange={(e) => setGuessName(e.target.value)}
+                      value={guessId}
+                      onChange={(e) => setGuessId(e.target.value)}
                       className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 bg-slate-50 text-gray-900 font-bold focus:border-blue-500 outline-none transition"
                     >
                       <option value="">Selecione um palpite</option>
                       {participants
                         .filter(p => p.id !== voterId)
                         .map(p => (
-                          <option key={p.id} value={p.name}>{p.name}</option>
+                          <option key={p.id} value={p.id}>{p.name}</option>
                         ))
                       }
                     </select>
@@ -309,13 +320,13 @@ const App: React.FC = () => {
 
                   <button 
                     onClick={handleCastVote}
-                    disabled={!voterId || !guessName || isVoting}
+                    disabled={!voterId || !guessId || isVoting}
                     className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-black text-xl rounded-2xl shadow-lg transform active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-3 uppercase"
                   >
-                    {isVoting ? <Sparkles className="animate-spin" /> : "Votar agora!"}
+                    {isVoting ? <Sparkles className="animate-spin" /> : (existingVote ? "Atualizar Palpite!" : "Votar agora!")}
                   </button>
                   <p className="text-[10px] text-center text-gray-400 font-bold uppercase tracking-widest italic">
-                    Somente um voto por pessoa. Visível para todos!
+                    Visível para todos! Você pode mudar seu palpite a qualquer momento selecionando seu nome.
                   </p>
                 </div>
               </div>
@@ -332,19 +343,42 @@ const App: React.FC = () => {
                     Ainda não temos palpites... Seja o primeiro!
                   </div>
                 ) : (
-                  <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                    {votes.map((v, i) => (
-                      <div key={i} className="bg-white/10 p-4 rounded-xl flex items-center justify-between border-l-4 border-christmas-gold group hover:bg-white/20 transition">
-                        <div>
-                          <span className="text-christmas-gold font-bold text-sm block uppercase tracking-tighter">O palpite de:</span>
-                          <span className="font-christmas text-xl">{v.voterName}</span>
+                  <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                    {votes.map((v, i) => {
+                      const voter = participants.find(p => p.id === v.id);
+                      const guessed = participants.find(p => p.id === v.guessId);
+                      
+                      return (
+                        <div key={i} className="bg-white/10 p-4 rounded-xl flex items-center justify-between border-l-4 border-christmas-gold group hover:bg-white/20 transition relative gap-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full border-2 border-christmas-gold overflow-hidden bg-white shrink-0">
+                               {voter?.avatar ? <img src={voter.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">?</div>}
+                            </div>
+                            <div>
+                              <span className="text-christmas-gold font-bold text-[10px] block uppercase tracking-tighter">Palpite de:</span>
+                              <span className="font-christmas text-lg leading-none">{v.voterName}</span>
+                            </div>
+                          </div>
+                          
+                          <div className="text-right flex items-center gap-3">
+                            <div className="flex flex-col items-end">
+                              <span className="text-white/60 font-bold text-[10px] block uppercase tracking-tighter">Acha que foi:</span>
+                              <span className="font-christmas text-lg text-blue-300 leading-none">{v.guessName}</span>
+                            </div>
+                            <div className="w-10 h-10 rounded-full border-2 border-blue-400 overflow-hidden bg-white shrink-0">
+                               {guessed?.avatar ? <img src={guessed.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">?</div>}
+                            </div>
+                            <button 
+                              onClick={() => handleEditVote(v)}
+                              className="p-1.5 bg-white/20 hover:bg-white/40 rounded-full transition opacity-0 group-hover:opacity-100 ml-1"
+                              title="Editar este palpite"
+                            >
+                              <Pencil className="w-3.5 h-3.5 text-white" />
+                            </button>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <span className="text-white/60 font-bold text-[10px] block uppercase tracking-tighter">Acha que foi tirado por:</span>
-                          <span className="font-christmas text-xl text-blue-300">{v.guessName}</span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

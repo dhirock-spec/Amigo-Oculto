@@ -110,10 +110,16 @@ export const subscribeToVotes = (callback: (data: Vote[]) => void) => {
 export const saveVoteToDb = async (vote: Vote) => {
   if (!db) {
     const stored = localStorage.getItem('paar_quiz_votes');
-    const votes = stored ? JSON.parse(stored) : [];
+    let votes = stored ? JSON.parse(stored) : [];
     const index = votes.findIndex((v: Vote) => v.id === vote.id);
-    if (index >= 0) return false; // Already voted locally
-    localStorage.setItem('paar_quiz_votes', JSON.stringify([...votes, vote]));
+    
+    if (index >= 0) {
+      votes[index] = vote; // Update existing
+    } else {
+      votes.push(vote); // Add new
+    }
+    
+    localStorage.setItem('paar_quiz_votes', JSON.stringify(votes));
     window.dispatchEvent(new Event('storage'));
     return true;
   }

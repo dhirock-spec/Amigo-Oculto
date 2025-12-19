@@ -24,8 +24,9 @@ export interface FoodItem {
 }
 
 export interface Vote {
-  id: string; // Participant ID who is voting
+  id: string; // Voter Participant ID
   voterName: string;
+  guessId: string; // Guessed Participant ID
   guessName: string;
 }
 
