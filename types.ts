@@ -14,4 +14,13 @@ export interface Participant {
   wishes: Gift[];
 }
 
+export interface FoodItem {
+  id: string;
+  name: string;
+  caption: string;
+  image: string;
+  contributorName: string;
+  contributorAvatar: string;
+}
+
 export type GiftSuggestion = Omit<Gift, 'id' | 'image'> & { imagePrompt: string };

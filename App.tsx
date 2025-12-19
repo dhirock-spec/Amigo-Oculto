@@ -1,150 +1,210 @@
 import React, { useState, useEffect } from 'react';
-import { Participant } from './types';
+import { Participant, FoodItem } from './types';
 import Snowfall from './components/Snowfall';
 import AddParticipantModal from './components/AddParticipantModal';
+import AddFoodModal from './components/AddFoodModal';
 import ParticipantCard from './components/ParticipantCard';
 import GiftDisplayModal from './components/GiftDisplayModal';
-import { Plus } from 'lucide-react';
-import { subscribeToParticipants, saveParticipantToDb, isFirebaseConfigured } from './services/firebase';
+import { Plus, Gift, Utensils, ChevronLeft } from 'lucide-react';
+import { 
+  subscribeToParticipants, 
+  saveParticipantToDb, 
+  subscribeToFood, 
+  saveFoodToDb, 
+  isFirebaseConfigured 
+} from './services/firebase';
+
+type ViewMode = 'menu' | 'gifts' | 'food';
 
 const App: React.FC = () => {
+  const [view, setView] = useState<ViewMode>('menu');
   const [participants, setParticipants] = useState<Participant[]>([]);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
   
-  // Agora armazenamos apenas o ID para garantir que o modal sempre mostre
-  // a versão mais recente dos dados vinda do banco de dados (tempo real)
+  const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
+  const [isAddFoodOpen, setIsAddFoodOpen] = useState(false);
+  
   const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null);
   const [editingParticipant, setEditingParticipant] = useState<Participant | undefined>(undefined);
 
-  // Initial Load & Real-time Subscription
   useEffect(() => {
-    const unsubscribe = subscribeToParticipants((data) => {
-      setParticipants(data);
-    });
-
-    return () => unsubscribe();
+    const unsubParticipants = subscribeToParticipants(setParticipants);
+    const unsubFood = subscribeToFood(setFoodItems);
+    return () => {
+      unsubParticipants();
+      unsubFood();
+    };
   }, []);
 
   const handleSaveParticipant = async (p: Participant) => {
-    // 1. Salva no banco (ou local storage)
     await saveParticipantToDb(p);
-    
-    // 2. Se estiver offline, atualiza a interface manualmente para parecer instantâneo
-    if (!isFirebaseConfigured) {
-       setParticipants(prev => {
-          const idx = prev.findIndex(x => x.id === p.id);
-          if (idx >= 0) {
-             const newArr = [...prev];
-             newArr[idx] = p;
-             return newArr;
-          }
-          return [...prev, p];
-       });
-    }
-
-    setIsAddModalOpen(false);
+    setIsAddParticipantOpen(false);
     setEditingParticipant(undefined);
   };
 
-  const handleStartEditing = (participant: Participant) => {
-    setSelectedParticipantId(null); // Fecha o modal de visualização
-    setEditingParticipant(participant); // Prepara dados para edição
-    setIsAddModalOpen(true); // Abre modal de edição
+  const handleSaveFood = async (f: FoodItem) => {
+    await saveFoodToDb(f);
+    setIsAddFoodOpen(false);
   };
 
-  const handleCloseModal = () => {
-    setIsAddModalOpen(false);
-    setEditingParticipant(undefined);
-  };
-
-  // Deriva o participante ativo baseado no ID selecionado e na lista atualizada
   const activeParticipant = participants.find(p => p.id === selectedParticipantId) || null;
 
   return (
     <div className="min-h-screen bg-[url('https://images.unsplash.com/photo-1534796636912-3b95b3ab5980?auto=format&fit=crop&q=80')] bg-cover bg-center bg-fixed text-slate-800 font-sans relative overflow-x-hidden">
       
-      {/* Overlay for readability */}
       <div className="fixed inset-0 bg-blue-950/60 pointer-events-none z-0" />
-      
       <Snowfall />
       
-      {/* Hero Header */}
-      <header className="relative z-10 pt-20 pb-12 px-4 text-center">
-        <div className="max-w-4xl mx-auto flex flex-col items-center">
-          
+      {/* Header Comum */}
+      <header className="relative z-10 pt-12 pb-6 px-4 text-center">
+        <button 
+          onClick={() => setView('menu')}
+          className="mx-auto flex flex-col items-center hover:scale-105 transition duration-300"
+        >
           <img 
             src="https://cdn-icons-png.flaticon.com/512/3662/3662584.png" 
-            alt="Presente de Natal" 
-            className="w-32 h-32 mb-6 drop-shadow-[0_0_20px_rgba(255,255,255,0.4)] hover:scale-110 transition duration-300"
+            alt="Logo" 
+            className="w-20 h-20 mb-2 drop-shadow-xl"
           />
-
-          <h1 className="text-6xl md:text-8xl font-christmas font-bold mb-4 drop-shadow-[0_0_15px_rgba(255,215,0,0.6)] text-christmas-gold animate-pulse">
-            Amigo Oculto Galera do Paar
+          <h1 className="text-4xl md:text-6xl font-christmas font-bold text-christmas-gold drop-shadow-lg">
+            Paar Noel 2024
           </h1>
-          <p className="text-xl md:text-2xl text-white font-light opacity-90 mb-8 max-w-2xl mx-auto drop-shadow-md font-christmas">
-            Troque presentes e alegria sob o céu estrelado de Natal.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <button 
-              onClick={() => {
-                setEditingParticipant(undefined);
-                setIsAddModalOpen(true);
-              }}
-              className="inline-flex items-center gap-2 bg-christmas-red text-white px-8 py-3 rounded-full font-bold text-lg shadow-[0_0_20px_rgba(212,36,38,0.6)] hover:bg-red-700 hover:scale-105 transition duration-200 border-2 border-christmas-gold"
-            >
-              <Plus className="w-6 h-6" />
-              Entrar na Lista
-            </button>
-          </div>
-        </div>
+        </button>
       </header>
 
-      {/* Main Content */}
       <main className="relative z-10 max-w-7xl mx-auto px-4 pb-20">
         
-        {participants.length === 0 ? (
-          <div className="bg-white/10 backdrop-blur-md rounded-xl p-12 text-center text-white border border-white/20 max-w-2xl mx-auto shadow-2xl">
-            <p className="text-3xl font-christmas mb-4">A noite está silenciosa...</p>
-            <p className="text-lg opacity-80">Seja o primeiro a adicionar seu nome na lista do Paar!</p>
+        {/* VIEW: MENU DE ENTRADA */}
+        {view === 'menu' && (
+          <div className="flex flex-col md:flex-row gap-8 justify-center items-stretch mt-12 max-w-4xl mx-auto">
+            <button 
+              onClick={() => setView('gifts')}
+              className="flex-1 bg-christmas-red hover:bg-red-700 text-white p-8 rounded-3xl shadow-2xl border-4 border-christmas-gold transform hover:-translate-y-2 transition-all flex flex-col items-center gap-6 group"
+            >
+              <div className="bg-white/20 p-6 rounded-full group-hover:scale-110 transition">
+                <Gift className="w-16 h-16 text-christmas-gold" />
+              </div>
+              <div className="text-center">
+                <h2 className="text-3xl font-christmas font-bold mb-2">Amigo Oculto</h2>
+                <p className="opacity-80 font-medium">Veja quem está na lista e o que querem ganhar!</p>
+              </div>
+            </button>
+
+            <button 
+              onClick={() => setView('food')}
+              className="flex-1 bg-christmas-green hover:bg-green-800 text-white p-8 rounded-3xl shadow-2xl border-4 border-christmas-gold transform hover:-translate-y-2 transition-all flex flex-col items-center gap-6 group"
+            >
+              <div className="bg-white/20 p-6 rounded-full group-hover:scale-110 transition">
+                <Utensils className="w-16 h-16 text-christmas-gold" />
+              </div>
+              <div className="text-center">
+                <h2 className="text-3xl font-christmas font-bold mb-2">Ceia da Galera</h2>
+                <p className="opacity-80 font-medium">O que vamos comer? Escolha seu prato (não vale repetir!)</p>
+              </div>
+            </button>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {participants.map(p => (
-              <ParticipantCard 
-                key={p.id} 
-                participant={p} 
-                onClick={() => setSelectedParticipantId(p.id)} 
-              />
-            ))}
+        )}
+
+        {/* VIEW: LISTA DE PRESENTES */}
+        {view === 'gifts' && (
+          <div className="space-y-8 animate-in fade-in duration-500">
+            <div className="flex justify-between items-center">
+              <button onClick={() => setView('menu')} className="text-white flex items-center gap-2 font-christmas text-xl hover:text-christmas-gold transition">
+                <ChevronLeft /> Voltar
+              </button>
+              <button 
+                onClick={() => { setEditingParticipant(undefined); setIsAddParticipantOpen(true); }}
+                className="bg-christmas-red text-white px-6 py-2 rounded-full font-bold shadow-lg hover:scale-105 transition flex items-center gap-2 border-2 border-christmas-gold"
+              >
+                <Plus className="w-5 h-5" /> Entrar na Lista
+              </button>
+            </div>
+            
+            {participants.length === 0 ? (
+              <div className="bg-white/10 backdrop-blur-md rounded-xl p-12 text-center text-white border border-white/20 max-w-2xl mx-auto">
+                <p className="text-3xl font-christmas mb-2">Ninguém chegou ainda...</p>
+                <p>Seja o primeiro a pedir seu presente!</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {participants.map(p => (
+                  <ParticipantCard key={p.id} participant={p} onClick={() => setSelectedParticipantId(p.id)} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* VIEW: LISTA DE COMIDAS */}
+        {view === 'food' && (
+          <div className="space-y-8 animate-in fade-in duration-500">
+            <div className="flex justify-between items-center">
+              <button onClick={() => setView('menu')} className="text-white flex items-center gap-2 font-christmas text-xl hover:text-christmas-gold transition">
+                <ChevronLeft /> Voltar
+              </button>
+              <button 
+                onClick={() => setIsAddFoodOpen(true)}
+                className="bg-christmas-green text-white px-6 py-2 rounded-full font-bold shadow-lg hover:scale-105 transition flex items-center gap-2 border-2 border-christmas-gold"
+              >
+                <Plus className="w-5 h-5" /> Adicionar Prato
+              </button>
+            </div>
+
+            {foodItems.length === 0 ? (
+              <div className="bg-white/10 backdrop-blur-md rounded-xl p-12 text-center text-white border border-white/20 max-w-2xl mx-auto">
+                <Utensils className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                <p className="text-3xl font-christmas mb-2">A mesa está vazia!</p>
+                <p>O que você vai preparar para a galera do Paar?</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                {foodItems.map(f => (
+                  <div key={f.id} className="bg-white rounded-3xl overflow-hidden shadow-2xl border-t-8 border-christmas-green transform hover:-translate-y-1 transition duration-300">
+                    <div className="aspect-video relative overflow-hidden">
+                      <img src={f.image} className="w-full h-full object-cover" />
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 text-white">
+                        <h3 className="text-2xl font-christmas font-bold">{f.name}</h3>
+                      </div>
+                    </div>
+                    <div className="p-5 space-y-3">
+                      <p className="text-gray-600 italic leading-relaxed">"{f.caption}"</p>
+                      <div className="pt-4 border-t border-gray-100 flex items-center gap-3">
+                        <img src={f.contributorAvatar} className="w-10 h-10 rounded-full border-2 border-christmas-green shadow-sm" />
+                        <div>
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-tighter">Quem traz:</p>
+                          <p className="text-christmas-green font-bold">{f.contributorName}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
       </main>
 
-      {/* Footer */}
       <footer className="relative z-10 py-8 text-center text-white/60 text-sm font-christmas text-lg">
         <p>© {new Date().getFullYear()} Galera do Paar. Desenvolvido por Diogenes Araujo.</p>
         <p className="text-xs mt-2 opacity-50">
-          {isFirebaseConfigured ? "🟢 Conectado ao Polo Norte" : "⚪ Modo Offline (Configure o Firebase para sincronizar)"}
+          {isFirebaseConfigured ? "🟢 Conectado ao Polo Norte" : "⚪ Modo Local (Offline)"}
         </p>
       </footer>
 
-      {/* Modals */}
-      {isAddModalOpen && (
-        <AddParticipantModal 
-          key={editingParticipant ? editingParticipant.id : 'new-participant'}
-          onClose={handleCloseModal} 
-          onSave={handleSaveParticipant}
-          initialData={editingParticipant}
-        />
+      {isAddParticipantOpen && (
+        <AddParticipantModal onClose={() => setIsAddParticipantOpen(false)} onSave={handleSaveParticipant} initialData={editingParticipant} />
+      )}
+
+      {isAddFoodOpen && (
+        <AddFoodModal existingFoods={foodItems} onClose={() => setIsAddFoodOpen(false)} onSave={handleSaveFood} />
       )}
 
       {activeParticipant && (
         <GiftDisplayModal 
           participant={activeParticipant} 
           onClose={() => setSelectedParticipantId(null)}
-          onEdit={handleStartEditing}
+          onEdit={(p) => { setSelectedParticipantId(null); setEditingParticipant(p); setIsAddParticipantOpen(true); }}
         />
       )}
 
