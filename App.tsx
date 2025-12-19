@@ -5,7 +5,7 @@ import AddParticipantModal from './components/AddParticipantModal';
 import AddFoodModal from './components/AddFoodModal';
 import ParticipantCard from './components/ParticipantCard';
 import GiftDisplayModal from './components/GiftDisplayModal';
-import { Plus, Gift, Utensils, ChevronLeft } from 'lucide-react';
+import { Plus, Gift, Utensils, ChevronLeft, Pencil, Sparkles } from 'lucide-react';
 import { 
   subscribeToParticipants, 
   saveParticipantToDb, 
@@ -26,6 +26,7 @@ const App: React.FC = () => {
   
   const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null);
   const [editingParticipant, setEditingParticipant] = useState<Participant | undefined>(undefined);
+  const [editingFood, setEditingFood] = useState<FoodItem | undefined>(undefined);
 
   useEffect(() => {
     const unsubParticipants = subscribeToParticipants(setParticipants);
@@ -45,6 +46,7 @@ const App: React.FC = () => {
   const handleSaveFood = async (f: FoodItem) => {
     await saveFoodToDb(f);
     setIsAddFoodOpen(false);
+    setEditingFood(undefined);
   };
 
   const activeParticipant = participants.find(p => p.id === selectedParticipantId) || null;
@@ -52,7 +54,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-[url('https://images.unsplash.com/photo-1534796636912-3b95b3ab5980?auto=format&fit=crop&q=80')] bg-cover bg-center bg-fixed text-slate-800 font-sans relative overflow-x-hidden">
       
-      <div className="fixed inset-0 bg-blue-950/60 pointer-events-none z-0" />
+      <div className="fixed inset-0 bg-blue-950/70 pointer-events-none z-0" />
       <Snowfall />
       
       {/* Header Comum */}
@@ -108,9 +110,9 @@ const App: React.FC = () => {
         {/* VIEW: LISTA DE PRESENTES */}
         {view === 'gifts' && (
           <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center bg-black/40 p-4 rounded-2xl backdrop-blur-lg border border-white/20">
               <button onClick={() => setView('menu')} className="text-white flex items-center gap-2 font-christmas text-xl hover:text-christmas-gold transition">
-                <ChevronLeft /> Voltar
+                <ChevronLeft /> Voltar ao Menu
               </button>
               <button 
                 onClick={() => { setEditingParticipant(undefined); setIsAddParticipantOpen(true); }}
@@ -138,12 +140,16 @@ const App: React.FC = () => {
         {/* VIEW: LISTA DE COMIDAS */}
         {view === 'food' && (
           <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center bg-black/40 p-4 rounded-2xl backdrop-blur-lg border border-white/20">
               <button onClick={() => setView('menu')} className="text-white flex items-center gap-2 font-christmas text-xl hover:text-christmas-gold transition">
-                <ChevronLeft /> Voltar
+                <ChevronLeft /> Voltar ao Menu
               </button>
+              <div className="text-center hidden md:block">
+                <h2 className="text-white font-christmas text-3xl">Ceia da Galera</h2>
+                <p className="text-christmas-gold text-xs font-bold uppercase">Clique em um prato para editar ou trocar</p>
+              </div>
               <button 
-                onClick={() => setIsAddFoodOpen(true)}
+                onClick={() => { setEditingFood(undefined); setIsAddFoodOpen(true); }}
                 className="bg-christmas-green text-white px-6 py-2 rounded-full font-bold shadow-lg hover:scale-105 transition flex items-center gap-2 border-2 border-christmas-gold"
               >
                 <Plus className="w-5 h-5" /> Adicionar Prato
@@ -157,27 +163,44 @@ const App: React.FC = () => {
                 <p>O que você vai preparar para a galera do Paar?</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                {foodItems.map(f => (
-                  <div key={f.id} className="bg-white rounded-3xl overflow-hidden shadow-2xl border-t-8 border-christmas-green transform hover:-translate-y-1 transition duration-300">
-                    <div className="aspect-video relative overflow-hidden">
-                      <img src={f.image} className="w-full h-full object-cover" />
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 text-white">
-                        <h3 className="text-2xl font-christmas font-bold">{f.name}</h3>
+              <div className="bg-black/20 backdrop-blur-sm p-4 md:p-8 rounded-3xl border border-white/10 shadow-inner">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {foodItems.map(f => (
+                    <div 
+                      key={f.id} 
+                      onClick={() => { setEditingFood(f); setIsAddFoodOpen(true); }}
+                      className="group bg-white rounded-3xl overflow-hidden shadow-2xl border-t-8 border-christmas-green transform hover:-translate-y-2 transition duration-300 relative cursor-pointer active:scale-95"
+                    >
+                      {/* Badge indicando que é clicável */}
+                      <div className="absolute top-4 right-4 z-20 bg-christmas-gold/90 text-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition duration-300">
+                        <Pencil className="w-4 h-4" />
                       </div>
-                    </div>
-                    <div className="p-5 space-y-3">
-                      <p className="text-gray-600 italic leading-relaxed">"{f.caption}"</p>
-                      <div className="pt-4 border-t border-gray-100 flex items-center gap-3">
-                        <img src={f.contributorAvatar} className="w-10 h-10 rounded-full border-2 border-christmas-green shadow-sm" />
-                        <div>
-                          <p className="text-xs font-bold text-gray-400 uppercase tracking-tighter">Quem traz:</p>
-                          <p className="text-christmas-green font-bold">{f.contributorName}</p>
+
+                      <div className="aspect-video relative overflow-hidden">
+                        <img src={f.image} className="w-full h-full object-cover transition duration-700 group-hover:scale-110" />
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-4 text-white">
+                          <h3 className="text-2xl font-christmas font-bold drop-shadow-md">{f.name}</h3>
+                        </div>
+                      </div>
+
+                      <div className="p-5 space-y-3 bg-white">
+                        <p className="text-gray-600 italic leading-relaxed text-sm">"{f.caption || "Sem descrição"}"</p>
+                        <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Chef Paar:</p>
+                              <p className="text-christmas-green font-bold text-sm">{f.contributorName}</p>
+                            </div>
+                          </div>
+                          <div className="text-christmas-gold flex items-center gap-1">
+                             <Sparkles className="w-4 h-4" />
+                             <span className="text-[10px] font-black uppercase">Editar</span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -197,7 +220,13 @@ const App: React.FC = () => {
       )}
 
       {isAddFoodOpen && (
-        <AddFoodModal existingFoods={foodItems} onClose={() => setIsAddFoodOpen(false)} onSave={handleSaveFood} />
+        <AddFoodModal 
+          key={editingFood ? editingFood.id : 'new-food'}
+          existingFoods={foodItems} 
+          onClose={() => { setIsAddFoodOpen(false); setEditingFood(undefined); }} 
+          onSave={handleSaveFood} 
+          initialData={editingFood}
+        />
       )}
 
       {activeParticipant && (
