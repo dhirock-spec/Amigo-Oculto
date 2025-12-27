@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Participant, FoodItem, Vote, MusicRequest } from './types';
+import { Participant, FoodItem, Vote } from './types';
 import Snowfall from './components/Snowfall';
 import AddParticipantModal from './components/AddParticipantModal';
 import AddFoodModal from './components/AddFoodModal';
 import ParticipantCard from './components/ParticipantCard';
 import GiftDisplayModal from './components/GiftDisplayModal';
-import { Plus, Gift, Utensils, ChevronLeft, Pencil, Sparkles, HelpCircle, CheckCircle2, UserCheck, AlertCircle, Trash2, Music, Search, Play, SkipForward } from 'lucide-react';
+import { Plus, Gift, Utensils, ChevronLeft, Pencil, Sparkles, HelpCircle, CheckCircle2, UserCheck, AlertCircle, Trash2 } from 'lucide-react';
 import { 
   subscribeToParticipants, 
   saveParticipantToDb, 
@@ -14,21 +14,16 @@ import {
   subscribeToVotes,
   saveVoteToDb,
   deleteVoteFromDb,
-  subscribeToMusicQueue,
-  saveMusicToDb,
-  removeMusicFromDb,
   isFirebaseConfigured 
 } from './services/firebase';
-import { searchMusicOnYoutube } from './services/geminiService';
 
-type ViewMode = 'menu' | 'gifts' | 'food' | 'quiz' | 'playlist';
+type ViewMode = 'menu' | 'gifts' | 'food' | 'quiz';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewMode>('menu');
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
-  const [musicQueue, setMusicQueue] = useState<MusicRequest[]>([]);
   
   const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
   const [isAddFoodOpen, setIsAddFoodOpen] = useState(false);
@@ -42,22 +37,14 @@ const App: React.FC = () => {
   const [guessId, setGuessId] = useState('');
   const [isVoting, setIsVoting] = useState(false);
 
-  // Music States
-  const [musicSearchQuery, setMusicSearchQuery] = useState('');
-  const [isSearchingMusic, setIsSearchingMusic] = useState(false);
-  const [requesterId, setRequesterId] = useState('');
-  const [musicError, setMusicError] = useState('');
-
   useEffect(() => {
     const unsubParticipants = subscribeToParticipants(setParticipants);
     const unsubFood = subscribeToFood(setFoodItems);
     const unsubVotes = subscribeToVotes(setVotes);
-    const unsubMusic = subscribeToMusicQueue(setMusicQueue);
     return () => {
       unsubParticipants();
       unsubFood();
       unsubVotes();
-      unsubMusic();
     };
   }, []);
 
@@ -95,55 +82,6 @@ const App: React.FC = () => {
     setGuessId('');
   };
 
-  const handleAddMusic = async () => {
-    if (!musicSearchQuery || !requesterId) return;
-    
-    const requester = participants.find(p => p.id === requesterId);
-    if (!requester) return;
-
-    setIsSearchingMusic(true);
-    setMusicError('');
-
-    try {
-      const result = await searchMusicOnYoutube(musicSearchQuery);
-      
-      if (!result) {
-        setMusicError('Não consegui encontrar essa música. Tente outro nome!');
-        return;
-      }
-
-      // Check for duplicates
-      if (musicQueue.some(m => m.youtubeId === result.youtubeId)) {
-        setMusicError('Essa música já está na fila! Escolha outra.');
-        return;
-      }
-
-      const newRequest: MusicRequest = {
-        id: crypto.randomUUID(),
-        youtubeId: result.youtubeId,
-        title: result.title,
-        artist: result.artist,
-        thumbnail: result.thumbnail,
-        requesterName: requester.name,
-        requesterId: requesterId,
-        createdAt: Date.now()
-      };
-
-      await saveMusicToDb(newRequest);
-      setMusicSearchQuery('');
-    } catch (err) {
-      setMusicError('Ocorreu um erro ao buscar a música.');
-    } finally {
-      setIsSearchingMusic(false);
-    }
-  };
-
-  const handleRemoveMusic = async (id: string) => {
-    if (confirm('Remover esta música da fila?')) {
-      await removeMusicFromDb(id);
-    }
-  };
-
   const handleEditVote = (vote: Vote) => {
     setVoterId(vote.id);
     setGuessId(vote.guessId);
@@ -163,8 +101,6 @@ const App: React.FC = () => {
   const activeParticipant = participants.find(p => p.id === selectedParticipantId) || null;
   const hasVoted = (id: string) => votes.some(v => v.id === id);
   const existingVote = votes.find(v => v.id === voterId);
-
-  const currentPlayingMusic = musicQueue[0] || null;
 
   return (
     <div className="min-h-screen bg-[url('https://images.unsplash.com/photo-1534796636912-3b95b3ab5980?auto=format&fit=crop&q=80')] bg-cover bg-center bg-fixed text-slate-800 font-sans relative overflow-x-hidden">
@@ -194,7 +130,7 @@ const App: React.FC = () => {
         
         {/* VIEW: MENU DE ENTRADA */}
         {view === 'menu' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mt-12 max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-12 max-w-5xl mx-auto">
             <button 
               onClick={() => setView('gifts')}
               className="flex-1 bg-christmas-red hover:bg-red-700 text-white p-8 rounded-3xl shadow-2xl border-4 border-christmas-gold transform hover:-translate-y-2 transition-all flex flex-col items-center gap-6 group"
@@ -233,177 +169,6 @@ const App: React.FC = () => {
                 <p className="opacity-80 font-medium">Quem você acha que tirou seu nome?</p>
               </div>
             </button>
-
-            <button 
-              onClick={() => setView('playlist')}
-              className="flex-1 bg-purple-600 hover:bg-purple-700 text-white p-8 rounded-3xl shadow-2xl border-4 border-christmas-gold transform hover:-translate-y-2 transition-all flex flex-col items-center gap-6 group"
-            >
-              <div className="bg-white/20 p-6 rounded-full group-hover:scale-110 transition">
-                <Music className="w-16 h-16 text-christmas-gold" />
-              </div>
-              <div className="text-center">
-                <h2 className="text-3xl font-christmas font-bold mb-2 animate-sway-only">Playlist Natalina</h2>
-                <p className="opacity-80 font-medium">Escolha as músicas que vão tocar na festa!</p>
-              </div>
-            </button>
-          </div>
-        )}
-
-        {/* VIEW: PLAYLIST / JUKEBOX */}
-        {view === 'playlist' && (
-          <div className="space-y-8 animate-in fade-in duration-500 max-w-6xl mx-auto">
-             <div className="flex justify-between items-center bg-black/40 p-4 rounded-2xl backdrop-blur-lg border border-white/20">
-              <button onClick={() => setView('menu')} className="text-white flex items-center gap-2 font-christmas text-xl hover:text-christmas-gold transition">
-                <ChevronLeft /> Voltar ao Menu
-              </button>
-              <h2 className="text-white font-christmas text-3xl animate-christmas-text hidden md:block">Som da Galera</h2>
-              <div className="w-32"></div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Left Column: Player & Search */}
-              <div className="lg:col-span-2 space-y-8">
-                {/* Search / Add Song */}
-                <div className="bg-white rounded-3xl p-8 shadow-2xl border-b-8 border-purple-600">
-                  <h3 className="text-2xl font-christmas font-bold text-christmas-dark mb-6 flex items-center gap-2">
-                    <Music className="text-purple-600" />
-                    Adicionar Música à Fila
-                  </h3>
-                  
-                  <div className="space-y-6">
-                    <div className="flex flex-col md:flex-row gap-4">
-                      <div className="flex-1">
-                        <label className="block text-sm font-black text-gray-500 uppercase tracking-widest mb-2">Quem está pedindo?</label>
-                        <select 
-                          value={requesterId}
-                          onChange={(e) => setRequesterId(e.target.value)}
-                          className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 bg-slate-50 text-gray-900 font-bold focus:border-purple-500 outline-none transition"
-                        >
-                          <option value="">Selecione seu nome</option>
-                          {participants.map(p => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="flex-[2]">
-                        <label className="block text-sm font-black text-gray-500 uppercase tracking-widest mb-2">Qual música quer ouvir?</label>
-                        <div className="relative">
-                          <input 
-                            type="text"
-                            value={musicSearchQuery}
-                            onChange={(e) => setMusicSearchQuery(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddMusic()}
-                            placeholder="Nome da música e artista..."
-                            className="w-full px-4 py-3 pr-12 rounded-xl border-2 border-gray-100 bg-slate-50 text-gray-900 font-bold focus:border-purple-500 outline-none transition"
-                          />
-                          <button 
-                            onClick={handleAddMusic}
-                            disabled={!musicSearchQuery || !requesterId || isSearchingMusic}
-                            className="absolute right-2 top-1.5 p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition"
-                          >
-                            {isSearchingMusic ? <Sparkles className="animate-spin w-5 h-5" /> : <Search className="w-5 h-5" />}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                    {musicError && <p className="text-red-600 text-sm font-bold animate-pulse">⚠️ {musicError}</p>}
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest italic">As músicas tocam na ordem em que foram adicionadas. Nada de música repetida!</p>
-                  </div>
-                </div>
-
-                {/* Main Player */}
-                <div className="bg-black rounded-3xl overflow-hidden shadow-2xl border-4 border-christmas-gold aspect-video relative group">
-                  {currentPlayingMusic ? (
-                    <iframe 
-                      width="100%" 
-                      height="100%" 
-                      src={`https://www.youtube.com/embed/${currentPlayingMusic.youtubeId}?autoplay=0&controls=1&modestbranding=1`} 
-                      title="YouTube video player" 
-                      frameBorder="0" 
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                      allowFullScreen
-                    ></iframe>
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-white p-12 text-center bg-gradient-to-br from-purple-900 to-black">
-                      <Music className="w-20 h-20 mb-6 opacity-20 animate-pulse" />
-                      <h4 className="text-3xl font-christmas font-bold mb-4">A Jukebox está descansando...</h4>
-                      <p className="text-purple-300 font-medium">Escolha uma música ao lado para animar a Galera do Paar!</p>
-                    </div>
-                  )}
-                  
-                  {currentPlayingMusic && (
-                    <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black to-transparent flex items-end justify-between pointer-events-none opacity-0 group-hover:opacity-100 transition duration-500">
-                      <div>
-                        <span className="bg-christmas-gold text-black px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-2 inline-block">Tocando agora</span>
-                        <h4 className="text-2xl font-christmas font-bold text-white">{currentPlayingMusic.title}</h4>
-                        <p className="text-white/70 text-sm">Pedida por: <span className="text-christmas-gold font-bold">{currentPlayingMusic.requesterName}</span></p>
-                      </div>
-                      <div className="flex gap-2 pointer-events-auto">
-                         <button 
-                           onClick={() => removeMusicFromDb(currentPlayingMusic.id)}
-                           className="bg-white/20 hover:bg-white/40 p-4 rounded-full text-white transition backdrop-blur-md"
-                           title="Pular música"
-                         >
-                           <SkipForward className="w-6 h-6" />
-                         </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Right Column: Queue List */}
-              <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 text-white shadow-2xl flex flex-col h-[600px] lg:h-auto overflow-hidden">
-                <h3 className="text-2xl font-christmas font-bold mb-6 flex items-center gap-2 shrink-0">
-                  <Play className="text-christmas-gold fill-current" />
-                  Fila de Espera ({musicQueue.length})
-                </h3>
-                
-                <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1">
-                  {musicQueue.length === 0 ? (
-                    <div className="text-center py-20 opacity-50 italic">
-                      A playlist está vazia... Adicione um hit!
-                    </div>
-                  ) : (
-                    musicQueue.map((music, idx) => (
-                      <div key={music.id} className={`flex gap-4 p-3 rounded-2xl border-l-4 transition group ${idx === 0 ? 'bg-purple-600/30 border-christmas-gold ring-2 ring-christmas-gold/20' : 'bg-white/5 border-purple-400 hover:bg-white/10'}`}>
-                        <div className="w-20 h-20 rounded-xl overflow-hidden bg-black shrink-0 relative shadow-lg">
-                          <img src={music.thumbnail} className="w-full h-full object-cover" />
-                          {idx === 0 && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                              <Play className="w-8 h-8 text-christmas-gold fill-current animate-pulse" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0 flex flex-col justify-center">
-                          <h5 className="font-bold truncate text-sm leading-tight text-white">{music.title}</h5>
-                          <p className="text-white/50 text-xs truncate mb-1">{music.artist}</p>
-                          <div className="flex items-center gap-2 mt-auto">
-                            <span className="text-[9px] font-black uppercase text-christmas-gold bg-black/40 px-2 py-0.5 rounded">Pedida por:</span>
-                            <span className="text-xs font-bold truncate">{music.requesterName}</span>
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-center justify-between py-1">
-                          <span className="text-lg font-christmas text-white/20">#{idx + 1}</span>
-                          <button 
-                            onClick={() => handleRemoveMusic(music.id)}
-                            className="p-1.5 hover:bg-red-500/50 rounded-full text-white/30 hover:text-white transition opacity-0 group-hover:opacity-100"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-                
-                {musicQueue.length > 0 && (
-                  <div className="mt-6 pt-6 border-t border-white/10 text-center">
-                    <p className="text-xs text-white/40 uppercase font-black tracking-widest">A música acaba e o próximo hit começa!</p>
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
         )}
 
