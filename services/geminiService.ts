@@ -1,12 +1,23 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { GiftSuggestion } from "../types";
 
-// Always use named parameter for apiKey and obtain it directly from process.env.API_KEY.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Safety check for process.env to avoid "process is not defined" in browser environments
+const getApiKey = () => {
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      return process.env.API_KEY || '';
+    }
+  } catch (e) {
+    // Ignore error if process is not accessible
+  }
+  return '';
+};
+
+const apiKey = getApiKey();
+const ai = new GoogleGenAI({ apiKey });
 
 export const generateGiftSuggestions = async (interests: string): Promise<GiftSuggestion[]> => {
-  // Check for API_KEY presence directly from process.env.
-  if (!process.env.API_KEY) {
+  if (!apiKey) {
     console.warn("No API Key provided, returning mock data");
     return [
       { title: "Meias Confortáveis", description: "Meias de lã quentes para o inverno.", imagePrompt: "wool socks" },
@@ -16,9 +27,8 @@ export const generateGiftSuggestions = async (interests: string): Promise<GiftSu
   }
 
   try {
-    // For basic text tasks like this, use 'gemini-3-flash-preview'.
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.5-flash",
       contents: `Sugira 3 ideias de presentes criativas e distintas de Amigo Secreto para alguém interessado em: ${interests}. 
       Responda em Português do Brasil. Mantenha as descrições curtas (menos de 15 palavras). Forneça um prompt visual para um gerador de imagem.`,
       config: {
@@ -38,9 +48,8 @@ export const generateGiftSuggestions = async (interests: string): Promise<GiftSu
       }
     });
 
-    // Access the text property directly from GenerateContentResponse.
     if (response.text) {
-      return JSON.parse(response.text.trim()) as GiftSuggestion[];
+      return JSON.parse(response.text) as GiftSuggestion[];
     }
     throw new Error("No data returned");
   } catch (error) {
@@ -50,10 +59,9 @@ export const generateGiftSuggestions = async (interests: string): Promise<GiftSu
 };
 
 export const generateGiftImage = async (prompt: string): Promise<string | null> => {
-  if (!process.env.API_KEY) return null;
+  if (!apiKey) return null;
   
   try {
-    // General Image Generation Tasks use 'gemini-2.5-flash-image'.
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
@@ -61,11 +69,10 @@ export const generateGiftImage = async (prompt: string): Promise<string | null> 
       },
     });
 
-    // Iterate through all parts to find the image part as recommended.
+    // Check all parts for the image
     for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        const base64EncodeString: string = part.inlineData.data;
-        return `data:image/png;base64,${base64EncodeString}`;
+      if (part.inlineData && part.inlineData.data) {
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
       }
     }
     return null;
@@ -76,23 +83,23 @@ export const generateGiftImage = async (prompt: string): Promise<string | null> 
 };
 
 export const searchMusicOnYoutube = async (query: string): Promise<{youtubeId: string, title: string, artist: string, thumbnail: string} | null> => {
-  if (!process.env.API_KEY) return null;
+  if (!apiKey) return null;
   
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Identifique o ID oficial do YouTube (11 caracteres) e os metadados para a música ou vídeo: "${query}". 
-      Tente encontrar a versão oficial do clipe ou áudio.
-      Retorne um JSON com: youtubeId, title, artist e thumbnail (URL da thumbnail oficial do YouTube: https://img.youtube.com/vi/[ID]/mqdefault.jpg).`,
+      model: "gemini-2.5-flash",
+      contents: `Identifique o ID oficial do YouTube e os metadados para a música: "${query}". 
+      Tente ser o mais preciso possível para um vídeo oficial de música (clipe ou áudio oficial).
+      Retorne apenas o JSON com youtubeId, title, artist e thumbnail (URL da thumbnail padrão do youtube).`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            youtubeId: { type: Type.STRING },
+            youtubeId: { type: Type.STRING, description: "O ID de 11 caracteres do YouTube" },
             title: { type: Type.STRING },
             artist: { type: Type.STRING },
-            thumbnail: { type: Type.STRING }
+            thumbnail: { type: Type.STRING, description: "URL da imagem https://img.youtube.com/vi/[ID]/mqdefault.jpg" }
           },
           required: ["youtubeId", "title", "artist", "thumbnail"]
         }
@@ -100,11 +107,11 @@ export const searchMusicOnYoutube = async (query: string): Promise<{youtubeId: s
     });
 
     if (response.text) {
-      return JSON.parse(response.text.trim());
+      return JSON.parse(response.text);
     }
     return null;
   } catch (error) {
-    console.error("Error searching music on YouTube:", error);
+    console.error("Error searching music:", error);
     return null;
   }
 };

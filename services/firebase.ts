@@ -14,7 +14,7 @@ const firebaseConfig = {
 
 export const isFirebaseConfigured = !!firebaseConfig.apiKey && firebaseConfig.apiKey !== "";
 
-let db: any = null;
+let db: any;
 
 if (isFirebaseConfigured) {
   try {
@@ -112,11 +112,13 @@ export const saveVoteToDb = async (vote: Vote) => {
     const stored = localStorage.getItem('paar_quiz_votes');
     let votes = stored ? JSON.parse(stored) : [];
     const index = votes.findIndex((v: Vote) => v.id === vote.id);
+    
     if (index >= 0) {
-      votes[index] = vote;
+      votes[index] = vote; // Update existing
     } else {
-      votes.push(vote);
+      votes.push(vote); // Add new
     }
+    
     localStorage.setItem('paar_quiz_votes', JSON.stringify(votes));
     window.dispatchEvent(new Event('storage'));
     return true;
@@ -125,7 +127,20 @@ export const saveVoteToDb = async (vote: Vote) => {
   return true;
 };
 
-// --- PLAYLIST ---
+export const deleteVoteFromDb = async (voteId: string) => {
+  if (!db) {
+    const stored = localStorage.getItem('paar_quiz_votes');
+    let votes = stored ? JSON.parse(stored) : [];
+    const filteredVotes = votes.filter((v: Vote) => v.id !== voteId);
+    localStorage.setItem('paar_quiz_votes', JSON.stringify(filteredVotes));
+    window.dispatchEvent(new Event('storage'));
+    return true;
+  }
+  await deleteDoc(doc(db, "votes", voteId));
+  return true;
+};
+
+// --- PLAYLIST / MUSICAS ---
 export const subscribeToMusicQueue = (callback: (data: MusicRequest[]) => void) => {
   if (!db) {
     const loadFromLocal = () => {
