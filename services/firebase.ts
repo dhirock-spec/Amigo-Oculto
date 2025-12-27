@@ -14,7 +14,7 @@ const firebaseConfig = {
 
 export const isFirebaseConfigured = !!firebaseConfig.apiKey && firebaseConfig.apiKey !== "";
 
-let db: any;
+let db: any = null;
 
 if (isFirebaseConfigured) {
   try {
@@ -112,31 +112,16 @@ export const saveVoteToDb = async (vote: Vote) => {
     const stored = localStorage.getItem('paar_quiz_votes');
     let votes = stored ? JSON.parse(stored) : [];
     const index = votes.findIndex((v: Vote) => v.id === vote.id);
-    
     if (index >= 0) {
-      votes[index] = vote; // Update existing
+      votes[index] = vote;
     } else {
-      votes.push(vote); // Add new
+      votes.push(vote);
     }
-    
     localStorage.setItem('paar_quiz_votes', JSON.stringify(votes));
     window.dispatchEvent(new Event('storage'));
     return true;
   }
   await setDoc(doc(db, "votes", vote.id), vote);
-  return true;
-};
-
-export const deleteVoteFromDb = async (voteId: string) => {
-  if (!db) {
-    const stored = localStorage.getItem('paar_quiz_votes');
-    let votes = stored ? JSON.parse(stored) : [];
-    const filteredVotes = votes.filter((v: Vote) => v.id !== voteId);
-    localStorage.setItem('paar_quiz_votes', JSON.stringify(filteredVotes));
-    window.dispatchEvent(new Event('storage'));
-    return true;
-  }
-  await deleteDoc(doc(db, "votes", voteId));
   return true;
 };
 
