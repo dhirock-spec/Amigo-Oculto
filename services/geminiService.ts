@@ -1,23 +1,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { GiftSuggestion } from "../types";
 
-// Safety check for process.env to avoid "process is not defined" in browser environments
-const getApiKey = () => {
-  try {
-    if (typeof process !== 'undefined' && process.env) {
-      return process.env.API_KEY || '';
-    }
-  } catch (e) {
-    // Ignore error if process is not accessible
-  }
-  return '';
-};
-
-const apiKey = getApiKey();
-const ai = new GoogleGenAI({ apiKey });
+// Always use named parameter for apiKey and obtain it directly from process.env.API_KEY.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const generateGiftSuggestions = async (interests: string): Promise<GiftSuggestion[]> => {
-  if (!apiKey) {
+  // Check for API_KEY presence directly from process.env.
+  if (!process.env.API_KEY) {
     console.warn("No API Key provided, returning mock data");
     return [
       { title: "Meias Confortáveis", description: "Meias de lã quentes para o inverno.", imagePrompt: "wool socks" },
@@ -27,8 +16,9 @@ export const generateGiftSuggestions = async (interests: string): Promise<GiftSu
   }
 
   try {
+    // For basic text tasks like this, use 'gemini-3-flash-preview'.
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: `Sugira 3 ideias de presentes criativas e distintas de Amigo Secreto para alguém interessado em: ${interests}. 
       Responda em Português do Brasil. Mantenha as descrições curtas (menos de 15 palavras). Forneça um prompt visual para um gerador de imagem.`,
       config: {
@@ -48,8 +38,9 @@ export const generateGiftSuggestions = async (interests: string): Promise<GiftSu
       }
     });
 
+    // Access the text property directly from GenerateContentResponse.
     if (response.text) {
-      return JSON.parse(response.text) as GiftSuggestion[];
+      return JSON.parse(response.text.trim()) as GiftSuggestion[];
     }
     throw new Error("No data returned");
   } catch (error) {
@@ -59,9 +50,10 @@ export const generateGiftSuggestions = async (interests: string): Promise<GiftSu
 };
 
 export const generateGiftImage = async (prompt: string): Promise<string | null> => {
-  if (!apiKey) return null;
+  if (!process.env.API_KEY) return null;
   
   try {
+    // General Image Generation Tasks use 'gemini-2.5-flash-image'.
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
@@ -69,10 +61,11 @@ export const generateGiftImage = async (prompt: string): Promise<string | null> 
       },
     });
 
-    // Check all parts for the image
+    // Iterate through all parts to find the image part as recommended.
     for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData && part.inlineData.data) {
-        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      if (part.inlineData) {
+        const base64EncodeString: string = part.inlineData.data;
+        return `data:image/png;base64,${base64EncodeString}`;
       }
     }
     return null;

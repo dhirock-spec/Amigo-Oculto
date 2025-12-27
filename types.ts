@@ -30,4 +30,15 @@ export interface Vote {
   guessName: string;
 }
 
+export interface MusicRequest {
+  id: string;
+  audioUrl?: string; // Optional direct URL for playback
+  title: string;
+  artist: string;
+  thumbnail?: string;
+  requesterName: string;
+  requesterId: string;
+  createdAt: number;
+}
+
 export type GiftSuggestion = Omit<Gift, 'id' | 'image'> & { imagePrompt: string };

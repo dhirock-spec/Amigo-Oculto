@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
-import { Participant, FoodItem, Vote } from '../types';
+import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { Participant, FoodItem, Vote, MusicRequest } from '../types';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA3pGzzEQvnasDlDSmsOnKrIEDXJfZ2WCc",
@@ -137,5 +137,51 @@ export const deleteVoteFromDb = async (voteId: string) => {
     return true;
   }
   await deleteDoc(doc(db, "votes", voteId));
+  return true;
+};
+
+// --- PLAYLIST ---
+export const subscribeToMusicQueue = (callback: (data: MusicRequest[]) => void) => {
+  if (!db) {
+    const loadFromLocal = () => {
+      const stored = localStorage.getItem('paar_party_music');
+      const music = stored ? JSON.parse(stored) : [];
+      callback(music.sort((a: any, b: any) => a.createdAt - b.createdAt));
+    };
+    loadFromLocal();
+    window.addEventListener('storage', loadFromLocal);
+    return () => window.removeEventListener('storage', loadFromLocal);
+  }
+
+  const q = query(collection(db, "music"), orderBy("createdAt", "asc"));
+  return onSnapshot(q, (snapshot) => {
+    const music = snapshot.docs.map(doc => doc.data() as MusicRequest);
+    callback(music);
+  });
+};
+
+export const saveMusicToDb = async (music: MusicRequest) => {
+  if (!db) {
+    const stored = localStorage.getItem('paar_party_music');
+    let musicList = stored ? JSON.parse(stored) : [];
+    musicList.push(music);
+    localStorage.setItem('paar_party_music', JSON.stringify(musicList));
+    window.dispatchEvent(new Event('storage'));
+    return true;
+  }
+  await setDoc(doc(db, "music", music.id), music);
+  return true;
+};
+
+export const removeMusicFromDb = async (id: string) => {
+  if (!db) {
+    const stored = localStorage.getItem('paar_party_music');
+    let musicList = stored ? JSON.parse(stored) : [];
+    const filtered = musicList.filter((m: MusicRequest) => m.id !== id);
+    localStorage.setItem('paar_party_music', JSON.stringify(filtered));
+    window.dispatchEvent(new Event('storage'));
+    return true;
+  }
+  await deleteDoc(doc(db, "music", id));
   return true;
 };
