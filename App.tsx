@@ -81,11 +81,21 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Sync player state with queue
+  // Control playback based on queue changes
   useEffect(() => {
-    if (audioRef.current && musicQueue[0]?.audioUrl) {
-      audioRef.current.load();
-      if (isPlaying) audioRef.current.play().catch(() => setIsPlaying(false));
+    const currentSong = musicQueue[0];
+    if (audioRef.current && currentSong?.audioUrl) {
+      // Se a URL mudou, recarrega
+      if (audioRef.current.src !== currentSong.audioUrl) {
+        audioRef.current.src = currentSong.audioUrl;
+        audioRef.current.load();
+        if (isPlaying) {
+          audioRef.current.play().catch(e => {
+            console.log("Autoplay bloqueado pelo navegador", e);
+            setIsPlaying(false);
+          });
+        }
+      }
     }
   }, [musicQueue[0]?.id]);
 
@@ -157,10 +167,18 @@ const App: React.FC = () => {
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
+      setIsPlaying(false);
     } else {
-      audioRef.current.play().catch(console.error);
+      audioRef.current.play().then(() => {
+        setIsPlaying(true);
+      }).catch(console.error);
     }
-    setIsPlaying(!isPlaying);
+  };
+
+  const handleMusicEnded = () => {
+    if (musicQueue[0]) {
+      removeMusicFromDb(musicQueue[0].id);
+    }
   };
 
   const activeParticipant = participants.find(p => p.id === selectedParticipantId) || null;
@@ -171,6 +189,14 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-[url('https://images.unsplash.com/photo-1534796636912-3b95b3ab5980?auto=format&fit=crop&q=80')] bg-cover bg-center bg-fixed text-slate-800 font-sans relative overflow-x-hidden">
       
+      {/* Global Audio Element */}
+      <audio 
+        ref={audioRef} 
+        onEnded={handleMusicEnded}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+      />
+
       <div className="fixed inset-0 bg-blue-950/70 pointer-events-none z-0" />
       <Snowfall />
       
@@ -309,14 +335,6 @@ const App: React.FC = () => {
                       
                       {currentMusic.audioUrl ? (
                         <div className="w-full max-w-sm space-y-6">
-                          <audio 
-                            ref={audioRef}
-                            src={currentMusic.audioUrl}
-                            onEnded={() => removeMusicFromDb(currentMusic.id)}
-                            onPlay={() => setIsPlaying(true)}
-                            onPause={() => setIsPlaying(false)}
-                            className="hidden"
-                          />
                           <div className="flex items-center justify-center gap-6">
                              <button onClick={togglePlay} className="w-20 h-20 bg-white text-purple-900 rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition active:scale-95">
                                {isPlaying ? <Pause className="w-10 h-10 fill-current" /> : <Play className="w-10 h-10 fill-current ml-1" />}
@@ -328,7 +346,7 @@ const App: React.FC = () => {
                           <div className="flex items-center gap-3 text-white/60">
                             <Volume2 className="w-4 h-4" />
                             <div className="h-1 flex-1 bg-white/20 rounded-full overflow-hidden">
-                              <div className="h-full bg-christmas-gold w-3/4"></div>
+                              <div className={`h-full bg-christmas-gold transition-all duration-300 ${isPlaying ? 'w-full' : 'w-0'}`}></div>
                             </div>
                           </div>
                         </div>
