@@ -32,10 +32,10 @@ export interface Vote {
 
 export interface MusicRequest {
   id: string;
-  audioUrl?: string; // Optional direct URL for playback
+  youtubeId: string;
   title: string;
   artist: string;
-  thumbnail?: string;
+  thumbnail: string;
   requesterName: string;
   requesterId: string;
   createdAt: number;

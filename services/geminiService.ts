@@ -74,3 +74,37 @@ export const generateGiftImage = async (prompt: string): Promise<string | null> 
     return null;
   }
 };
+
+export const searchMusicOnYoutube = async (query: string): Promise<{youtubeId: string, title: string, artist: string, thumbnail: string} | null> => {
+  if (!process.env.API_KEY) return null;
+  
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Identifique o ID oficial do YouTube (11 caracteres) e os metadados para a música ou vídeo: "${query}". 
+      Tente encontrar a versão oficial do clipe ou áudio.
+      Retorne um JSON com: youtubeId, title, artist e thumbnail (URL da thumbnail oficial do YouTube: https://img.youtube.com/vi/[ID]/mqdefault.jpg).`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            youtubeId: { type: Type.STRING },
+            title: { type: Type.STRING },
+            artist: { type: Type.STRING },
+            thumbnail: { type: Type.STRING }
+          },
+          required: ["youtubeId", "title", "artist", "thumbnail"]
+        }
+      }
+    });
+
+    if (response.text) {
+      return JSON.parse(response.text.trim());
+    }
+    return null;
+  } catch (error) {
+    console.error("Error searching music on YouTube:", error);
+    return null;
+  }
+};

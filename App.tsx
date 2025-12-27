@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Participant, FoodItem, Vote, MusicRequest } from './types';
 import Snowfall from './components/Snowfall';
 import AddParticipantModal from './components/AddParticipantModal';
 import AddFoodModal from './components/AddFoodModal';
 import ParticipantCard from './components/ParticipantCard';
 import GiftDisplayModal from './components/GiftDisplayModal';
-import { Plus, Gift, Utensils, ChevronLeft, Pencil, HelpCircle, CheckCircle2, UserCheck, AlertCircle, Trash2, Sparkles, Music, Play, SkipForward, Volume2, Pause } from 'lucide-react';
+import { Plus, Gift, Utensils, ChevronLeft, Pencil, HelpCircle, CheckCircle2, UserCheck, AlertCircle, Trash2, Sparkles, Music, Play, SkipForward, Search, Loader2 } from 'lucide-react';
 import { 
   subscribeToParticipants, 
   saveParticipantToDb, 
@@ -19,25 +19,23 @@ import {
   removeMusicFromDb,
   isFirebaseConfigured 
 } from './services/firebase';
+import { searchMusicOnYoutube } from './services/geminiService';
 
 type ViewMode = 'menu' | 'gifts' | 'food' | 'quiz' | 'playlist';
 
-interface SongSuggestion {
-  title: string;
-  artist: string;
-  url?: string;
-  thumb: string;
+interface QuickSuggestion {
+  label: string;
+  query: string;
+  emoji: string;
 }
 
-const SONG_SUGGESTIONS: SongSuggestion[] = [
-  { title: "Jingle Bells", artist: "Kevin MacLeod", url: "https://upload.wikimedia.org/wikipedia/commons/e/e9/Jingle_Bells_-_Kevin_MacLeod.ogg", thumb: "🔔" },
-  { title: "Deck the Halls", artist: "Kevin MacLeod", url: "https://upload.wikimedia.org/wikipedia/commons/8/89/Deck_the_Halls_-_Kevin_MacLeod.ogg", thumb: "🌿" },
-  { title: "We Wish You a Merry Christmas", artist: "Kevin MacLeod", url: "https://upload.wikimedia.org/wikipedia/commons/9/9b/We_Wish_You_a_Merry_Christmas_-_Kevin_MacLeod.ogg", thumb: "🥧" },
-  { title: "Silent Night", artist: "Franz Gruber", url: "https://upload.wikimedia.org/wikipedia/commons/1/18/Silent_Night_vocal.ogg", thumb: "✨" },
-  { title: "O Christmas Tree", artist: "Traditional", url: "https://upload.wikimedia.org/wikipedia/commons/3/30/O_Christmas_Tree_Instrumental.ogg", thumb: "🎄" },
-  { title: "All I Want for Christmas", artist: "Mariah Carey (Request)", thumb: "🎤" },
-  { title: "Last Christmas", artist: "Wham! (Request)", thumb: "❄️" },
-  { title: "Happy Xmas (War Is Over)", artist: "John Lennon (Request)", thumb: "🕊️" },
+const QUICK_SUGGESTIONS: QuickSuggestion[] = [
+  { label: "Jingle Bell Rock", query: "Jingle Bell Rock Bobby Helms", emoji: "🎸" },
+  { label: "All I Want for Xmas", query: "Mariah Carey All I Want for Christmas Is You", emoji: "🎤" },
+  { label: "Last Christmas", query: "Wham Last Christmas", emoji: "❄️" },
+  { label: "Feliz Navidad", query: "José Feliciano Feliz Navidad", emoji: "🪅" },
+  { label: "Então é Natal", query: "Simone Então é Natal", emoji: "🇧🇷" },
+  { label: "Merry Christmas", query: "Ed Sheeran Elton John Merry Christmas", emoji: "🎹" },
 ];
 
 const App: React.FC = () => {
@@ -60,13 +58,10 @@ const App: React.FC = () => {
   const [isVoting, setIsVoting] = useState(false);
 
   // Music States
-  const [musicTitle, setMusicTitle] = useState('');
-  const [musicArtist, setMusicArtist] = useState('');
-  const [selectedAudioUrl, setSelectedAudioUrl] = useState<string | undefined>(undefined);
+  const [musicSearchQuery, setMusicSearchQuery] = useState('');
   const [requesterId, setRequesterId] = useState('');
-  const [isPlaying, setIsPlaying] = useState(false);
-  
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isSearchingMusic, setIsSearchingMusic] = useState(false);
+  const [musicError, setMusicError] = useState('');
 
   useEffect(() => {
     const unsubParticipants = subscribeToParticipants(setParticipants);
@@ -80,24 +75,6 @@ const App: React.FC = () => {
       unsubMusic();
     };
   }, []);
-
-  // Control playback based on queue changes
-  useEffect(() => {
-    const currentSong = musicQueue[0];
-    if (audioRef.current && currentSong?.audioUrl) {
-      // Se a URL mudou, recarrega
-      if (audioRef.current.src !== currentSong.audioUrl) {
-        audioRef.current.src = currentSong.audioUrl;
-        audioRef.current.load();
-        if (isPlaying) {
-          audioRef.current.play().catch(e => {
-            console.log("Autoplay bloqueado pelo navegador", e);
-            setIsPlaying(false);
-          });
-        }
-      }
-    }
-  }, [musicQueue[0]?.id]);
 
   const handleSaveParticipant = async (p: Participant) => {
     await saveParticipantToDb(p);
@@ -130,54 +107,56 @@ const App: React.FC = () => {
     setGuessId('');
   };
 
-  const handleAddMusic = async () => {
-    if (!musicTitle || !requesterId) return;
+  const handleAddMusic = async (overrideQuery?: string) => {
+    const query = overrideQuery || musicSearchQuery;
+    if (!query || !requesterId) {
+      if (!requesterId) setMusicError('Selecione quem está pedindo primeiro!');
+      return;
+    }
+    
     const requester = participants.find(p => p.id === requesterId);
     if (!requester) return;
 
-    const newRequest: MusicRequest = {
-      id: crypto.randomUUID(),
-      title: musicTitle,
-      artist: musicArtist || 'Artista Desconhecido',
-      audioUrl: selectedAudioUrl,
-      requesterName: requester.name,
-      requesterId: requesterId,
-      createdAt: Date.now()
-    };
+    setIsSearchingMusic(true);
+    setMusicError('');
 
-    await saveMusicToDb(newRequest);
-    setMusicTitle('');
-    setMusicArtist('');
-    setSelectedAudioUrl(undefined);
-  };
+    try {
+      const result = await searchMusicOnYoutube(query);
+      
+      if (!result || !result.youtubeId) {
+        setMusicError('Não consegui encontrar essa música no YouTube. Tente outro nome!');
+        return;
+      }
 
-  const handleApplySuggestion = (s: SongSuggestion) => {
-    setMusicTitle(s.title);
-    setMusicArtist(s.artist);
-    setSelectedAudioUrl(s.url);
+      // Evita duplicatas na fila
+      if (musicQueue.some(m => m.youtubeId === result.youtubeId)) {
+        setMusicError('Essa música já está na fila! Escolha outra.');
+        return;
+      }
+
+      const newRequest: MusicRequest = {
+        id: crypto.randomUUID(),
+        youtubeId: result.youtubeId,
+        title: result.title,
+        artist: result.artist,
+        thumbnail: result.thumbnail,
+        requesterName: requester.name,
+        requesterId: requesterId,
+        createdAt: Date.now()
+      };
+
+      await saveMusicToDb(newRequest);
+      setMusicSearchQuery('');
+    } catch (err) {
+      setMusicError('Ocorreu um erro ao buscar a música.');
+    } finally {
+      setIsSearchingMusic(false);
+    }
   };
 
   const handleRemoveMusic = async (id: string) => {
     if (confirm('Remover esta música da fila?')) {
       await removeMusicFromDb(id);
-    }
-  };
-
-  const togglePlay = () => {
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current.play().then(() => {
-        setIsPlaying(true);
-      }).catch(console.error);
-    }
-  };
-
-  const handleMusicEnded = () => {
-    if (musicQueue[0]) {
-      removeMusicFromDb(musicQueue[0].id);
     }
   };
 
@@ -189,14 +168,6 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-[url('https://images.unsplash.com/photo-1534796636912-3b95b3ab5980?auto=format&fit=crop&q=80')] bg-cover bg-center bg-fixed text-slate-800 font-sans relative overflow-x-hidden">
       
-      {/* Global Audio Element */}
-      <audio 
-        ref={audioRef} 
-        onEnded={handleMusicEnded}
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-      />
-
       <div className="fixed inset-0 bg-blue-950/70 pointer-events-none z-0" />
       <Snowfall />
       
@@ -241,7 +212,7 @@ const App: React.FC = () => {
               <div className="bg-white/20 p-6 rounded-full group-hover:scale-110 transition"><Music className="w-16 h-16 text-christmas-gold" /></div>
               <div className="text-center">
                 <h2 className="text-3xl font-christmas font-bold mb-2">Escolha a sua música</h2>
-                <p className="opacity-80 font-medium">Monte a trilha sonora da nossa festa!</p>
+                <p className="opacity-80 font-medium">Busque e toque clipes do YouTube!</p>
               </div>
             </button>
           </div>
@@ -253,37 +224,44 @@ const App: React.FC = () => {
               <button onClick={() => setView('menu')} className="text-white flex items-center gap-2 font-christmas text-xl hover:text-christmas-gold transition">
                 <ChevronLeft /> Voltar ao Menu
               </button>
-              <h2 className="text-white font-christmas text-3xl animate-christmas-text hidden md:block">Escolha a sua música</h2>
+              <h2 className="text-white font-christmas text-3xl animate-christmas-text hidden md:block">YouTube Party Paar</h2>
               <div className="w-32"></div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2 space-y-8">
-                {/* Formulario e Sugestoes */}
+                {/* Busca e Sugestões */}
                 <div className="bg-white rounded-3xl p-8 shadow-2xl border-b-8 border-purple-600">
                   <h3 className="text-2xl font-christmas font-bold text-christmas-dark mb-4 flex items-center gap-2">
                     <Music className="text-purple-600" />
-                    Qual música quer ouvir?
+                    Adicionar Música à Fila
                   </h3>
-                  
-                  {/* Sugestoes */}
-                  <div className="mb-6 flex flex-wrap gap-2">
-                    {SONG_SUGGESTIONS.map((s, i) => (
-                      <button 
-                        key={i} 
-                        onClick={() => handleApplySuggestion(s)}
-                        className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 border border-purple-200"
-                      >
-                        <span className="text-sm">{s.thumb}</span>
-                        {s.title}
-                      </button>
-                    ))}
-                  </div>
 
+                  <div className="mb-6 space-y-4">
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Sugestões Rápidas:</label>
+                    <div className="flex flex-wrap gap-2">
+                      {QUICK_SUGGESTIONS.map((s, i) => (
+                        <button 
+                          key={i} 
+                          onClick={() => {
+                            if (!requesterId) {
+                               setMusicError('Selecione quem você é primeiro!');
+                               return;
+                            }
+                            handleAddMusic(s.query);
+                          }}
+                          className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-3 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1.5 border border-purple-200"
+                        >
+                          <span className="text-sm">{s.emoji}</span> {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Quem pede?</label>
+                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Quem está pedindo?</label>
                         <select 
                           value={requesterId}
                           onChange={(e) => setRequesterId(e.target.value)}
@@ -294,74 +272,67 @@ const App: React.FC = () => {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Música</label>
-                        <input 
-                          type="text"
-                          value={musicTitle}
-                          onChange={(e) => setMusicTitle(e.target.value)}
-                          placeholder="Ex: Jingle Bell Rock"
-                          className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 bg-slate-50 text-gray-900 font-bold focus:border-purple-500 outline-none transition"
-                        />
+                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Busca YouTube</label>
+                        <div className="relative">
+                          <input 
+                            type="text"
+                            value={musicSearchQuery}
+                            onChange={(e) => setMusicSearchQuery(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddMusic()}
+                            placeholder="Música ou Artista..."
+                            className="w-full px-4 py-3 pr-12 rounded-xl border-2 border-gray-100 bg-slate-50 text-gray-900 font-bold focus:border-purple-500 outline-none transition"
+                          />
+                          <button 
+                            onClick={() => handleAddMusic()}
+                            disabled={isSearchingMusic || !musicSearchQuery}
+                            className="absolute right-2 top-1.5 p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition"
+                          >
+                            {isSearchingMusic ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+                          </button>
+                        </div>
                       </div>
                     </div>
-                    <button 
-                      onClick={handleAddMusic}
-                      disabled={!musicTitle || !requesterId}
-                      className="w-full py-4 bg-purple-600 hover:bg-purple-700 text-white font-black text-xl rounded-2xl shadow-lg transform active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-3 uppercase"
-                    >
-                      Adicionar à Fila de Natal <Sparkles className="w-5 h-5" />
-                    </button>
+                    {musicError && <p className="text-red-600 text-xs font-bold animate-pulse">⚠️ {musicError}</p>}
                   </div>
                 </div>
 
-                {/* Player Simplificado */}
-                <div className="bg-gradient-to-br from-purple-900 to-indigo-950 rounded-3xl p-8 shadow-2xl border-4 border-christmas-gold text-white relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-12 opacity-5"><Music className="w-64 h-64" /></div>
-                  
+                {/* Player YouTube */}
+                <div className="bg-black rounded-3xl overflow-hidden shadow-2xl border-4 border-christmas-gold aspect-video relative group">
                   {currentMusic ? (
-                    <div className="relative z-10 flex flex-col items-center text-center">
-                      <div className="w-48 h-48 bg-white/10 rounded-full flex items-center justify-center mb-6 shadow-inner ring-4 ring-white/5 border border-white/10 relative">
-                        <div className={`text-6xl ${isPlaying ? 'animate-spin' : ''}`} style={{ animationDuration: '10s' }}>
-                          {SONG_SUGGESTIONS.find(s => s.title === currentMusic.title)?.thumb || '🎵'}
-                        </div>
-                        {currentMusic.audioUrl && (
-                           <div className="absolute -bottom-2 bg-christmas-gold text-black px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">Audio Disponível</div>
-                        )}
-                      </div>
-                      
-                      <h4 className="text-3xl font-christmas font-bold mb-1">{currentMusic.title}</h4>
-                      <p className="text-purple-300 font-bold mb-2">{currentMusic.artist}</p>
-                      <p className="text-white/40 text-xs mb-8">Pedida por: <span className="text-christmas-gold font-bold">{currentMusic.requesterName}</span></p>
-                      
-                      {currentMusic.audioUrl ? (
-                        <div className="w-full max-w-sm space-y-6">
-                          <div className="flex items-center justify-center gap-6">
-                             <button onClick={togglePlay} className="w-20 h-20 bg-white text-purple-900 rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition active:scale-95">
-                               {isPlaying ? <Pause className="w-10 h-10 fill-current" /> : <Play className="w-10 h-10 fill-current ml-1" />}
-                             </button>
-                             <button onClick={() => removeMusicFromDb(currentMusic.id)} className="w-12 h-12 bg-white/20 hover:bg-white/30 text-white rounded-full flex items-center justify-center transition">
-                               <SkipForward className="w-6 h-6" />
-                             </button>
-                          </div>
-                          <div className="flex items-center gap-3 text-white/60">
-                            <Volume2 className="w-4 h-4" />
-                            <div className="h-1 flex-1 bg-white/20 rounded-full overflow-hidden">
-                              <div className={`h-full bg-christmas-gold transition-all duration-300 ${isPlaying ? 'w-full' : 'w-0'}`}></div>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="bg-black/30 p-6 rounded-2xl border border-white/10 text-center">
-                          <p className="text-sm font-bold opacity-80 mb-2 italic">Pedido Especial Registrado!</p>
-                          <p className="text-[10px] uppercase font-black text-christmas-gold tracking-widest">Aguardando o DJ tocar no som principal da festa</p>
-                        </div>
-                      )}
-                    </div>
+                    <iframe 
+                      key={currentMusic.id}
+                      width="100%" 
+                      height="100%" 
+                      src={`https://www.youtube.com/embed/${currentMusic.youtubeId}?autoplay=1&mute=0&rel=0&modestbranding=1&enablejsapi=1`} 
+                      title="YouTube video player" 
+                      frameBorder="0" 
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                      allowFullScreen
+                    ></iframe>
                   ) : (
-                    <div className="flex flex-col items-center justify-center py-20 opacity-50">
-                      <Music className="w-20 h-20 mb-6 animate-pulse" />
-                      <h4 className="text-3xl font-christmas font-bold mb-2">A Jukebox está esperando...</h4>
-                      <p className="font-medium">Nenhum pedido na fila ainda.</p>
+                    <div className="w-full h-full flex flex-col items-center justify-center text-white p-12 text-center bg-gradient-to-br from-purple-900 to-black">
+                      <Music className="w-20 h-20 mb-6 opacity-20 animate-pulse" />
+                      <h4 className="text-3xl font-christmas font-bold mb-4">Aguardando seu pedido...</h4>
+                      <p className="text-purple-300 font-medium italic">Busque uma música para animar a festa do Paar!</p>
+                    </div>
+                  )}
+                  
+                  {currentMusic && (
+                    <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black to-transparent flex items-end justify-between group-hover:opacity-100 transition duration-500 pointer-events-none">
+                      <div className="bg-black/60 backdrop-blur-md p-4 rounded-2xl border border-white/10 pointer-events-auto">
+                        <span className="bg-christmas-gold text-black px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-2 inline-block">Tocando agora</span>
+                        <h4 className="text-xl font-christmas font-bold text-white leading-tight">{currentMusic.title}</h4>
+                        <p className="text-white/70 text-xs">{currentMusic.artist} • <span className="text-christmas-gold font-bold">Por: {currentMusic.requesterName}</span></p>
+                      </div>
+                      <div className="pointer-events-auto">
+                        <button 
+                          onClick={() => removeMusicFromDb(currentMusic.id)}
+                          className="bg-christmas-red hover:bg-red-700 p-4 rounded-full text-white transition shadow-xl border-2 border-white/20"
+                          title="Pular música"
+                        >
+                          <SkipForward className="w-6 h-6" />
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -371,7 +342,7 @@ const App: React.FC = () => {
               <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 text-white shadow-2xl flex flex-col h-[600px] lg:h-auto overflow-hidden">
                 <h3 className="text-2xl font-christmas font-bold mb-6 flex items-center gap-2 shrink-0">
                   <Play className="text-christmas-gold fill-current" />
-                  Próximas Músicas ({musicQueue.length})
+                  Próximas ({musicQueue.length})
                 </h3>
                 
                 <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1">
@@ -380,8 +351,9 @@ const App: React.FC = () => {
                   ) : (
                     musicQueue.map((music, idx) => (
                       <div key={music.id} className={`flex gap-4 p-3 rounded-2xl border-l-4 transition group ${idx === 0 ? 'bg-purple-600/30 border-christmas-gold' : 'bg-white/5 border-purple-400 hover:bg-white/10'}`}>
-                        <div className="w-12 h-12 rounded-xl bg-black/40 flex items-center justify-center text-2xl shrink-0">
-                          {SONG_SUGGESTIONS.find(s => s.title === music.title)?.thumb || '🎵'}
+                        <div className="w-16 h-12 rounded-lg bg-black overflow-hidden shrink-0 relative">
+                          <img src={music.thumbnail} alt="thumb" className="w-full h-full object-cover opacity-60" />
+                          {idx === 0 && <div className="absolute inset-0 flex items-center justify-center"><Play className="w-5 h-5 text-christmas-gold fill-current animate-pulse" /></div>}
                         </div>
                         <div className="flex-1 min-w-0 flex flex-col justify-center">
                           <h5 className="font-bold truncate text-sm leading-tight text-white">{music.title}</h5>

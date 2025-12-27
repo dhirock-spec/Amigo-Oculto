@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Gift, Participant } from '../types';
 import { X, Upload, Image as ImageIcon, Gift as GiftIcon, Save, Trash2, Loader2 } from 'lucide-react';
@@ -196,7 +197,8 @@ const AddParticipantModal: React.FC<Props> = ({ onClose, onSave, initialData }) 
                     type="file" 
                     className="hidden" 
                     accept="image/*"
-                    ref={el => (wishFileRefs.current[idx] = el)}
+                    // Fix: Wrapped assignment in braces to return void and avoid TypeScript error
+                    ref={el => { wishFileRefs.current[idx] = el; }}
                     onChange={(e) => handleWishImageUpload(idx, e)}
                   />
                   
