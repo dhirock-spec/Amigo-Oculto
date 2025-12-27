@@ -47,7 +47,7 @@ const GiftDisplayModal: React.FC<Props> = ({ participant, onClose, onEdit }) => 
                 <img src={participant.avatar} alt={participant.name} className="w-full h-full object-cover" />
               </div>
               <div>
-                <h2 className="text-3xl font-serif font-bold">Lista de Desejos de {participant.name}</h2>
+                <h2 className="text-3xl font-serif font-bold">Sugestões de Presentes de {participant.name}</h2>
                 <p className="text-white/80 max-w-lg mx-auto mt-2 italic">"{participant.interests}"</p>
               </div>
             </div>

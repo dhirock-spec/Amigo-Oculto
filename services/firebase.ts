@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
-import { Participant, FoodItem, Vote } from '../types';
+import { Participant, FoodItem, Vote, SecretMessage } from '../types';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA3pGzzEQvnasDlDSmsOnKrIEDXJfZ2WCc",
@@ -112,18 +112,58 @@ export const saveVoteToDb = async (vote: Vote) => {
     const stored = localStorage.getItem('paar_quiz_votes');
     let votes = stored ? JSON.parse(stored) : [];
     const index = votes.findIndex((v: Vote) => v.id === vote.id);
-    
-    if (index >= 0) {
-      votes[index] = vote; // Update existing
-    } else {
-      votes.push(vote); // Add new
-    }
-    
+    if (index >= 0) votes[index] = vote;
+    else votes.push(vote);
     localStorage.setItem('paar_quiz_votes', JSON.stringify(votes));
     window.dispatchEvent(new Event('storage'));
     return true;
   }
   await setDoc(doc(db, "votes", vote.id), vote);
+  return true;
+};
+
+// --- MENSAGENS SECRETAS ---
+export const subscribeToMessages = (callback: (data: SecretMessage[]) => void) => {
+  if (!db) {
+    const loadFromLocal = () => {
+      const stored = localStorage.getItem('paar_secret_messages');
+      const messages = stored ? JSON.parse(stored) : [];
+      callback(messages.sort((a: any, b: any) => b.createdAt - a.createdAt));
+    };
+    loadFromLocal();
+    window.addEventListener('storage', loadFromLocal);
+    return () => window.removeEventListener('storage', loadFromLocal);
+  }
+
+  const q = query(collection(db, "messages"), orderBy("createdAt", "desc"));
+  return onSnapshot(q, (snapshot) => {
+    const messages = snapshot.docs.map(doc => doc.data() as SecretMessage);
+    callback(messages);
+  });
+};
+
+export const saveMessageToDb = async (message: SecretMessage) => {
+  if (!db) {
+    const stored = localStorage.getItem('paar_secret_messages');
+    const messages = stored ? JSON.parse(stored) : [];
+    localStorage.setItem('paar_secret_messages', JSON.stringify([message, ...messages]));
+    window.dispatchEvent(new Event('storage'));
+    return true;
+  }
+  await setDoc(doc(db, "messages", message.id), message);
+  return true;
+};
+
+export const deleteMessageFromDb = async (id: string) => {
+  if (!db) {
+    const stored = localStorage.getItem('paar_secret_messages');
+    let messages = stored ? JSON.parse(stored) : [];
+    messages = messages.filter((m: any) => m.id !== id);
+    localStorage.setItem('paar_secret_messages', JSON.stringify(messages));
+    window.dispatchEvent(new Event('storage'));
+    return true;
+  }
+  await deleteDoc(doc(db, "messages", id));
   return true;
 };
 

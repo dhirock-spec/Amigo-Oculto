@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Gift, Participant } from '../types';
 import { X, Upload, Image as ImageIcon, Gift as GiftIcon, Save, Trash2, Loader2 } from 'lucide-react';
@@ -154,7 +153,7 @@ const AddParticipantModal: React.FC<Props> = ({ onClose, onSave, initialData }) 
 
           {/* Step 2: Wishes */}
           <section className="space-y-4">
-            <h3 className="text-lg font-bold text-christmas-dark border-b-2 border-christmas-gold/50 pb-2">2. Seus 3 Principais Desejos</h3>
+            <h3 className="text-lg font-bold text-christmas-dark border-b-2 border-christmas-gold/50 pb-2">2. Suas 3 Sugestões de Presentes</h3>
             
             <div className="grid gap-6 md:grid-cols-3">
               {wishes.map((wish, idx) => (

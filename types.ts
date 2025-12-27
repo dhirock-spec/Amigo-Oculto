@@ -30,4 +30,13 @@ export interface Vote {
   guessName: string;
 }
 
+export interface SecretMessage {
+  id: string;
+  senderName: string; // Can be "Anônimo"
+  recipientId: string;
+  recipientName: string;
+  content: string;
+  createdAt: number;
+}
+
 export type GiftSuggestion = Omit<Gift, 'id' | 'image'> & { imagePrompt: string };

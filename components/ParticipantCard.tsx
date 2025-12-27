@@ -27,7 +27,7 @@ const ParticipantCard: React.FC<Props> = ({ participant, onClick }) => {
       <div className="text-center">
         <h3 className="font-serif font-bold text-xl text-christmas-dark truncate">{participant.name}</h3>
         <p className="text-xs text-christmas-red font-medium uppercase tracking-wider mt-1">
-          {participant.wishes.filter(w => w.title).length} Desejos Listados
+          {participant.wishes.filter(w => w.title).length} Sugestões Listadas
         </p>
       </div>
 

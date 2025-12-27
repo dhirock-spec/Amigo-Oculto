@@ -100,7 +100,7 @@ const AddFoodModal: React.FC<Props> = ({ existingFoods, onClose, onSave, initial
               value={contributorName}
               onChange={e => setContributorName(e.target.value)}
               className={inputClassName}
-              placeholder="Ex: Diogenes Araujo"
+              placeholder="Ex: Diógenes Araújo"
             />
           </div>
 
