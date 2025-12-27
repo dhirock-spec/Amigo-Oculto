@@ -5,7 +5,7 @@ import AddParticipantModal from './components/AddParticipantModal';
 import AddFoodModal from './components/AddFoodModal';
 import ParticipantCard from './components/ParticipantCard';
 import GiftDisplayModal from './components/GiftDisplayModal';
-import { Plus, Gift, Utensils, ChevronLeft, Pencil, HelpCircle, CheckCircle2, UserCheck, AlertCircle, Trash2, Sparkles, Music, Play, SkipForward, Search, Loader2 } from 'lucide-react';
+import { Plus, Gift, Utensils, ChevronLeft, HelpCircle, CheckCircle2, UserCheck, Trash2, Sparkles, Music, Play, SkipForward, Search, Loader2 } from 'lucide-react';
 import { 
   subscribeToParticipants, 
   saveParticipantToDb, 
@@ -13,7 +13,6 @@ import {
   saveFoodToDb, 
   subscribeToVotes,
   saveVoteToDb,
-  deleteVoteFromDb,
   subscribeToMusicQueue,
   saveMusicToDb,
   removeMusicFromDb,
@@ -128,7 +127,6 @@ const App: React.FC = () => {
         return;
       }
 
-      // Evita duplicatas na fila
       if (musicQueue.some(m => m.youtubeId === result.youtubeId)) {
         setMusicError('Essa música já está na fila! Escolha outra.');
         return;
@@ -147,6 +145,7 @@ const App: React.FC = () => {
 
       await saveMusicToDb(newRequest);
       setMusicSearchQuery('');
+      setMusicError('');
     } catch (err) {
       setMusicError('Ocorreu um erro ao buscar a música.');
     } finally {
@@ -188,7 +187,7 @@ const App: React.FC = () => {
               <div className="bg-white/20 p-6 rounded-full group-hover:scale-110 transition"><Gift className="w-16 h-16 text-christmas-gold" /></div>
               <div className="text-center">
                 <h2 className="text-3xl font-christmas font-bold mb-2">Amigo Oculto</h2>
-                <p className="opacity-80 font-medium">Veja quem está na lista e o que querem ganhar!</p>
+                <p className="opacity-80 font-medium">Desejos de presentes e lista de participantes!</p>
               </div>
             </button>
 
@@ -196,7 +195,7 @@ const App: React.FC = () => {
               <div className="bg-white/20 p-6 rounded-full group-hover:scale-110 transition"><Utensils className="w-16 h-16 text-christmas-gold" /></div>
               <div className="text-center">
                 <h2 className="text-3xl font-christmas font-bold mb-2">Ceia da Galera</h2>
-                <p className="opacity-80 font-medium">O que vamos comer? Escolha seu prato!</p>
+                <p className="opacity-80 font-medium">Veja o menu colaborativo da nossa festa!</p>
               </div>
             </button>
 
@@ -204,15 +203,15 @@ const App: React.FC = () => {
               <div className="bg-white/20 p-6 rounded-full group-hover:scale-110 transition"><HelpCircle className="w-16 h-16 text-christmas-gold" /></div>
               <div className="text-center">
                 <h2 className="text-3xl font-christmas font-bold mb-2">Quiz Palpite</h2>
-                <p className="opacity-80 font-medium">Quem você acha que tirou seu nome?</p>
+                <p className="opacity-80 font-medium">Quem você acha que tirou o seu nome?</p>
               </div>
             </button>
 
             <button onClick={() => setView('playlist')} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white p-8 rounded-3xl shadow-2xl border-4 border-christmas-gold transform hover:-translate-y-2 transition-all flex flex-col items-center gap-6 group">
               <div className="bg-white/20 p-6 rounded-full group-hover:scale-110 transition"><Music className="w-16 h-16 text-christmas-gold" /></div>
               <div className="text-center">
-                <h2 className="text-3xl font-christmas font-bold mb-2">Escolha a sua música</h2>
-                <p className="opacity-80 font-medium">Busque e toque clipes do YouTube!</p>
+                <h2 className="text-3xl font-christmas font-bold mb-2">Playlist YouTube</h2>
+                <p className="opacity-80 font-medium">Monte a trilha sonora com vídeos reais!</p>
               </div>
             </button>
           </div>
@@ -230,7 +229,6 @@ const App: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2 space-y-8">
-                {/* Busca e Sugestões */}
                 <div className="bg-white rounded-3xl p-8 shadow-2xl border-b-8 border-purple-600">
                   <h3 className="text-2xl font-christmas font-bold text-christmas-dark mb-4 flex items-center gap-2">
                     <Music className="text-purple-600" />
@@ -238,18 +236,12 @@ const App: React.FC = () => {
                   </h3>
 
                   <div className="mb-6 space-y-4">
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Sugestões Rápidas:</label>
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Sugestões de Natal:</label>
                     <div className="flex flex-wrap gap-2">
                       {QUICK_SUGGESTIONS.map((s, i) => (
                         <button 
                           key={i} 
-                          onClick={() => {
-                            if (!requesterId) {
-                               setMusicError('Selecione quem você é primeiro!');
-                               return;
-                            }
-                            handleAddMusic(s.query);
-                          }}
+                          onClick={() => handleAddMusic(s.query)}
                           className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-3 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1.5 border border-purple-200"
                         >
                           <span className="text-sm">{s.emoji}</span> {s.label}
@@ -296,7 +288,6 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Player YouTube */}
                 <div className="bg-black rounded-3xl overflow-hidden shadow-2xl border-4 border-christmas-gold aspect-video relative group">
                   {currentMusic ? (
                     <iframe 
@@ -304,7 +295,7 @@ const App: React.FC = () => {
                       width="100%" 
                       height="100%" 
                       src={`https://www.youtube.com/embed/${currentMusic.youtubeId}?autoplay=1&mute=0&rel=0&modestbranding=1&enablejsapi=1`} 
-                      title="YouTube video player" 
+                      title="YouTube Party Player" 
                       frameBorder="0" 
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
                       allowFullScreen
@@ -313,16 +304,16 @@ const App: React.FC = () => {
                     <div className="w-full h-full flex flex-col items-center justify-center text-white p-12 text-center bg-gradient-to-br from-purple-900 to-black">
                       <Music className="w-20 h-20 mb-6 opacity-20 animate-pulse" />
                       <h4 className="text-3xl font-christmas font-bold mb-4">Aguardando seu pedido...</h4>
-                      <p className="text-purple-300 font-medium italic">Busque uma música para animar a festa do Paar!</p>
+                      <p className="text-purple-300 font-medium italic">Busque uma música ou use as sugestões!</p>
                     </div>
                   )}
                   
                   {currentMusic && (
                     <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black to-transparent flex items-end justify-between group-hover:opacity-100 transition duration-500 pointer-events-none">
-                      <div className="bg-black/60 backdrop-blur-md p-4 rounded-2xl border border-white/10 pointer-events-auto">
+                      <div className="bg-black/60 backdrop-blur-md p-4 rounded-2xl border border-white/10 pointer-events-auto max-w-[70%]">
                         <span className="bg-christmas-gold text-black px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-2 inline-block">Tocando agora</span>
-                        <h4 className="text-xl font-christmas font-bold text-white leading-tight">{currentMusic.title}</h4>
-                        <p className="text-white/70 text-xs">{currentMusic.artist} • <span className="text-christmas-gold font-bold">Por: {currentMusic.requesterName}</span></p>
+                        <h4 className="text-xl font-christmas font-bold text-white leading-tight truncate">{currentMusic.title}</h4>
+                        <p className="text-white/70 text-xs truncate">{currentMusic.artist} • <span className="text-christmas-gold font-bold">Por: {currentMusic.requesterName}</span></p>
                       </div>
                       <div className="pointer-events-auto">
                         <button 
@@ -338,7 +329,6 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* Fila Direita */}
               <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 text-white shadow-2xl flex flex-col h-[600px] lg:h-auto overflow-hidden">
                 <h3 className="text-2xl font-christmas font-bold mb-6 flex items-center gap-2 shrink-0">
                   <Play className="text-christmas-gold fill-current" />
@@ -376,7 +366,6 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* LISTA DE PRESENTES */}
         {view === 'gifts' && (
           <div className="space-y-8 animate-in fade-in duration-500">
             <div className="flex justify-between items-center bg-black/40 p-4 rounded-2xl backdrop-blur-lg border border-white/20">
@@ -396,7 +385,6 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* LISTA DE COMIDAS */}
         {view === 'food' && (
           <div className="space-y-8 animate-in fade-in duration-500">
             <div className="flex justify-between items-center bg-black/40 p-4 rounded-2xl backdrop-blur-lg border border-white/20">
@@ -426,7 +414,6 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* QUIZ */}
         {view === 'quiz' && (
           <div className="space-y-8 animate-in fade-in duration-500 max-w-4xl mx-auto">
             <div className="flex justify-between items-center bg-black/40 p-4 rounded-2xl backdrop-blur-lg border border-white/20">
