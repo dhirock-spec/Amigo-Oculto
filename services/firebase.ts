@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, query, orderBy, updateDoc, increment } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, query, orderBy, updateDoc, increment, getDoc } from 'firebase/firestore';
 import { Participant, FoodItem, Vote, SecretMessage, Poll, PollOption, PollVote } from '../types';
 
 const firebaseConfig = {
@@ -262,48 +262,62 @@ export const subscribeToPollVotes = (callback: (data: PollVote[]) => void) => {
   });
 };
 
-export const savePollVoteToDb = async (pollVote: PollVote) => {
+export const savePollVoteToDb = async (pollVote: PollVote, previousOptionId?: string) => {
   if (!db) {
     const stored = localStorage.getItem('paar_poll_votes_registry');
-    const votes = stored ? JSON.parse(stored) : [];
-    localStorage.setItem('paar_poll_votes_registry', JSON.stringify([...votes, pollVote]));
+    let votes = stored ? JSON.parse(stored) : [];
     
-    // Also increment the count in the option
-    const optionsStored = localStorage.getItem('paar_poll_options');
-    let options = optionsStored ? JSON.parse(optionsStored) : [];
-    const idx = options.findIndex((o: PollOption) => o.id === pollVote.optionId);
-    if (idx >= 0) {
-      options[idx].votes = (options[idx].votes || 0) + 1;
+    // Check if it's an update
+    const existingIndex = votes.findIndex((v: PollVote) => v.participantId === pollVote.participantId && v.pollId === pollVote.pollId);
+    
+    if (existingIndex >= 0) {
+      // Update existing vote
+      const oldOptionId = votes[existingIndex].optionId;
+      votes[existingIndex] = pollVote;
+      
+      const optionsStored = localStorage.getItem('paar_poll_options');
+      let options = optionsStored ? JSON.parse(optionsStored) : [];
+      
+      // Decrement old
+      const oldIdx = options.findIndex((o: PollOption) => o.id === oldOptionId);
+      if (oldIdx >= 0) options[oldIdx].votes = Math.max(0, (options[oldIdx].votes || 0) - 1);
+      
+      // Increment new
+      const newIdx = options.findIndex((o: PollOption) => o.id === pollVote.optionId);
+      if (newIdx >= 0) options[newIdx].votes = (options[newIdx].votes || 0) + 1;
+      
+      localStorage.setItem('paar_poll_options', JSON.stringify(options));
+    } else {
+      // New vote
+      votes.push(pollVote);
+      const optionsStored = localStorage.getItem('paar_poll_options');
+      let options = optionsStored ? JSON.parse(optionsStored) : [];
+      const idx = options.findIndex((o: PollOption) => o.id === pollVote.optionId);
+      if (idx >= 0) options[idx].votes = (options[idx].votes || 0) + 1;
       localStorage.setItem('paar_poll_options', JSON.stringify(options));
     }
 
+    localStorage.setItem('paar_poll_votes_registry', JSON.stringify(votes));
     window.dispatchEvent(new Event('storage'));
     return true;
   }
   
-  await setDoc(doc(db, "pollVotes", pollVote.id), pollVote);
+  // Firebase Logic
+  if (previousOptionId) {
+    // It's a change of vote
+    await updateDoc(doc(db, "pollOptions", previousOptionId), {
+      votes: increment(-1)
+    });
+  }
+  
+  // Save or Update the Vote Document (use a predictable ID: participantId_pollId)
+  const voteDocId = `${pollVote.participantId}_${pollVote.pollId}`;
+  await setDoc(doc(db, "pollVotes", voteDocId), { ...pollVote, id: voteDocId });
+  
+  // Increment new option
   await updateDoc(doc(db, "pollOptions", pollVote.optionId), {
     votes: increment(1)
   });
-  return true;
-};
-
-export const voteOnOptionInDb = async (optionId: string) => {
-  // Legacy function for backward compatibility if needed, 
-  // but we prefer savePollVoteToDb now for tracking.
-  if (!db) {
-    const stored = localStorage.getItem('paar_poll_options');
-    let options = stored ? JSON.parse(stored) : [];
-    const index = options.findIndex((o: PollOption) => o.id === optionId);
-    if (index >= 0) {
-      options[index].votes = (options[index].votes || 0) + 1;
-      localStorage.setItem('paar_poll_options', JSON.stringify(options));
-      window.dispatchEvent(new Event('storage'));
-    }
-    return true;
-  }
-  await updateDoc(doc(db, "pollOptions", optionId), {
-    votes: increment(1)
-  });
+  
   return true;
 };

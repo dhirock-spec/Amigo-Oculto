@@ -184,14 +184,20 @@ const App: React.FC = () => {
     if (!voter || !option) return;
 
     // Check if already voted in THIS poll
-    const alreadyVoted = pollVotes.some(v => v.pollId === pollId && v.participantId === currentVoterId);
-    if (alreadyVoted) {
-      alert(`Peraí ${voter.name}! Você já votou nesta categoria. É apenas 1 voto por pessoa! 🎅`);
-      return;
+    const existingVote = pollVotes.find(v => v.pollId === pollId && v.participantId === currentVoterId);
+    
+    if (existingVote) {
+      if (existingVote.optionId === optionId) {
+        alert("Você já votou nesta opção! 🎅");
+        return;
+      }
+      
+      const confirmChange = confirm(`Peraí ${voter.name}! Você já votou em "${existingVote.optionName}". Deseja MUDAR seu voto para "${option.name}"? 🎅`);
+      if (!confirmChange) return;
     }
 
     const newPollVote: PollVote = {
-      id: crypto.randomUUID(),
+      id: existingVote ? existingVote.id : crypto.randomUUID(),
       pollId: pollId,
       optionId: optionId,
       participantId: currentVoterId,
@@ -199,7 +205,7 @@ const App: React.FC = () => {
       optionName: option.name
     };
 
-    await savePollVoteToDb(newPollVote);
+    await savePollVoteToDb(newPollVote, existingVote?.optionId);
   };
 
   const handleAdminLogin = () => {
@@ -329,9 +335,8 @@ const App: React.FC = () => {
                             <Award className="w-6 h-6 text-yellow-200" />
                             <h3 className="text-xl font-christmas font-bold">{poll.title}</h3>
                          </div>
-                         {/* Fix: Lucide icons do not support 'title' prop. Wrapped in span to provide tooltip. */}
                          {myVoteInThisPoll && (
-                           <span title="Você já votou aqui">
+                           <span title={`Você votou em: ${myVoteInThisPoll.optionName}`}>
                              <CheckCircle2 className="w-5 h-5 text-green-400" />
                            </span>
                          )}
@@ -368,16 +373,14 @@ const App: React.FC = () => {
                                     )}
                                     <button 
                                       onClick={() => handleVoteOnPoll(poll.id, option.id)}
-                                      disabled={!!myVoteInThisPoll}
-                                      className={`absolute inset-0 w-full h-full flex items-center justify-center text-[10px] font-black uppercase transition-opacity ${myVoteInThisPoll ? 'opacity-0 cursor-not-allowed' : 'opacity-0 group-hover:opacity-100 bg-black/10 hover:bg-black/20'}`}
+                                      className={`absolute inset-0 w-full h-full flex items-center justify-center text-[10px] font-black uppercase transition-opacity ${isMyChoice ? 'opacity-0 cursor-default' : 'opacity-0 group-hover:opacity-100 bg-black/10 hover:bg-black/20'}`}
                                     >
-                                      Votar em {option.name}
+                                      {myVoteInThisPoll ? 'Mudar para este' : `Votar em ${option.name}`}
                                     </button>
                                   </div>
                                   <button 
                                     onClick={() => handleVoteOnPoll(poll.id, option.id)} 
-                                    disabled={!!myVoteInThisPoll}
-                                    className={`p-2 rounded-lg transition ${isMyChoice ? 'bg-green-100 text-green-600' : myVoteInThisPoll ? 'bg-slate-50 text-slate-300' : 'bg-slate-50 hover:bg-yellow-100 text-yellow-700'}`}
+                                    className={`p-2 rounded-lg transition ${isMyChoice ? 'bg-green-100 text-green-600' : 'bg-slate-50 hover:bg-yellow-100 text-yellow-700'}`}
                                   >
                                     <ThumbsUp className="w-4 h-4" />
                                   </button>
