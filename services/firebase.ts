@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, query, orderBy, updateDoc, increment } from 'firebase/firestore';
-import { Participant, FoodItem, Vote, SecretMessage, Poll, PollOption } from '../types';
+import { Participant, FoodItem, Vote, SecretMessage, Poll, PollOption, PollVote } from '../types';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA3pGzzEQvnasDlDSmsOnKrIEDXJfZ2WCc",
@@ -89,7 +89,7 @@ export const saveFoodToDb = async (food: FoodItem) => {
   return true;
 };
 
-// --- QUIZ / VOTOS ---
+// --- QUIZ / VOTOS PALPITES ---
 export const subscribeToVotes = (callback: (data: Vote[]) => void) => {
   if (!db) {
     const loadFromLocal = () => {
@@ -244,7 +244,53 @@ export const savePollOptionToDb = async (option: PollOption) => {
   return true;
 };
 
+// --- POLL VOTES ---
+export const subscribeToPollVotes = (callback: (data: PollVote[]) => void) => {
+  if (!db) {
+    const loadFromLocal = () => {
+      const stored = localStorage.getItem('paar_poll_votes_registry');
+      callback(stored ? JSON.parse(stored) : []);
+    };
+    loadFromLocal();
+    window.addEventListener('storage', loadFromLocal);
+    return () => window.removeEventListener('storage', loadFromLocal);
+  }
+
+  return onSnapshot(collection(db, "pollVotes"), (snapshot) => {
+    const pollVotes = snapshot.docs.map(doc => doc.data() as PollVote);
+    callback(pollVotes);
+  });
+};
+
+export const savePollVoteToDb = async (pollVote: PollVote) => {
+  if (!db) {
+    const stored = localStorage.getItem('paar_poll_votes_registry');
+    const votes = stored ? JSON.parse(stored) : [];
+    localStorage.setItem('paar_poll_votes_registry', JSON.stringify([...votes, pollVote]));
+    
+    // Also increment the count in the option
+    const optionsStored = localStorage.getItem('paar_poll_options');
+    let options = optionsStored ? JSON.parse(optionsStored) : [];
+    const idx = options.findIndex((o: PollOption) => o.id === pollVote.optionId);
+    if (idx >= 0) {
+      options[idx].votes = (options[idx].votes || 0) + 1;
+      localStorage.setItem('paar_poll_options', JSON.stringify(options));
+    }
+
+    window.dispatchEvent(new Event('storage'));
+    return true;
+  }
+  
+  await setDoc(doc(db, "pollVotes", pollVote.id), pollVote);
+  await updateDoc(doc(db, "pollOptions", pollVote.optionId), {
+    votes: increment(1)
+  });
+  return true;
+};
+
 export const voteOnOptionInDb = async (optionId: string) => {
+  // Legacy function for backward compatibility if needed, 
+  // but we prefer savePollVoteToDb now for tracking.
   if (!db) {
     const stored = localStorage.getItem('paar_poll_options');
     let options = stored ? JSON.parse(stored) : [];

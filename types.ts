@@ -52,4 +52,13 @@ export interface PollOption {
   votes: number;
 }
 
+export interface PollVote {
+  id: string;
+  pollId: string;
+  optionId: string;
+  participantId: string;
+  participantName: string;
+  optionName: string;
+}
+
 export type GiftSuggestion = Omit<Gift, 'id' | 'image'> & { imagePrompt: string };

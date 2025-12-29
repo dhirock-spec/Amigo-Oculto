@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Participant, FoodItem, Vote, SecretMessage, Poll, PollOption } from './types';
+import { Participant, FoodItem, Vote, SecretMessage, Poll, PollOption, PollVote } from './types';
 import Snowfall from './components/Snowfall';
 import AddParticipantModal from './components/AddParticipantModal';
 import AddFoodModal from './components/AddFoodModal';
 import ParticipantCard from './components/ParticipantCard';
 import GiftDisplayModal from './components/GiftDisplayModal';
-import { Plus, Gift, Utensils, ChevronLeft, HelpCircle, CheckCircle2, UserCheck, Trash2, Mail, Send, Trophy, Lock, Unlock, Award, ThumbsUp, X, Save, KeyRound } from 'lucide-react';
+import { Plus, Gift, Utensils, ChevronLeft, HelpCircle, CheckCircle2, UserCheck, Trash2, Mail, Send, Trophy, Lock, Unlock, Award, ThumbsUp, X, Save, KeyRound, Users } from 'lucide-react';
 import { 
   subscribeToParticipants, 
   saveParticipantToDb, 
@@ -21,7 +21,8 @@ import {
   savePollToDb,
   subscribeToPollOptions,
   savePollOptionToDb,
-  voteOnOptionInDb,
+  subscribeToPollVotes,
+  savePollVoteToDb,
   isFirebaseConfigured 
 } from './services/firebase';
 
@@ -35,6 +36,7 @@ const App: React.FC = () => {
   const [messages, setMessages] = useState<SecretMessage[]>([]);
   const [polls, setPolls] = useState<Poll[]>([]);
   const [pollOptions, setPollOptions] = useState<PollOption[]>([]);
+  const [pollVotes, setPollVotes] = useState<PollVote[]>([]);
   
   const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
   const [isAddFoodOpen, setIsAddFoodOpen] = useState(false);
@@ -51,6 +53,7 @@ const App: React.FC = () => {
   const [newOptionName, setNewOptionName] = useState<{ [pollId: string]: string }>({});
   const [newPollTitle, setNewPollTitle] = useState('');
   const [newPollDesc, setNewPollDesc] = useState('');
+  const [currentVoterId, setCurrentVoterId] = useState('');
 
   // Quiz States
   const [voterId, setVoterId] = useState('');
@@ -70,6 +73,7 @@ const App: React.FC = () => {
     const unsubMessages = subscribeToMessages(setMessages);
     const unsubPolls = subscribeToPolls(setPolls);
     const unsubOptions = subscribeToPollOptions(setPollOptions);
+    const unsubPollVotes = subscribeToPollVotes(setPollVotes);
     
     return () => {
       unsubParticipants();
@@ -78,6 +82,7 @@ const App: React.FC = () => {
       unsubMessages();
       unsubPolls();
       unsubOptions();
+      unsubPollVotes();
     };
   }, []);
 
@@ -168,8 +173,33 @@ const App: React.FC = () => {
     setNewPollDesc('');
   };
 
-  const handleVoteOnPoll = async (optionId: string) => {
-    await voteOnOptionInDb(optionId);
+  const handleVoteOnPoll = async (pollId: string, optionId: string) => {
+    if (!currentVoterId) {
+      alert("Por favor, selecione QUEM está votando no topo da página!");
+      return;
+    }
+
+    const voter = participants.find(p => p.id === currentVoterId);
+    const option = pollOptions.find(o => o.id === optionId);
+    if (!voter || !option) return;
+
+    // Check if already voted in THIS poll
+    const alreadyVoted = pollVotes.some(v => v.pollId === pollId && v.participantId === currentVoterId);
+    if (alreadyVoted) {
+      alert(`Peraí ${voter.name}! Você já votou nesta categoria. É apenas 1 voto por pessoa! 🎅`);
+      return;
+    }
+
+    const newPollVote: PollVote = {
+      id: crypto.randomUUID(),
+      pollId: pollId,
+      optionId: optionId,
+      participantId: currentVoterId,
+      participantName: voter.name,
+      optionName: option.name
+    };
+
+    await savePollVoteToDb(newPollVote);
   };
 
   const handleAdminLogin = () => {
@@ -249,7 +279,19 @@ const App: React.FC = () => {
           <div className="space-y-8 animate-in fade-in duration-500 max-w-6xl mx-auto">
             <div className="flex flex-col md:flex-row justify-between items-center bg-black/40 p-4 rounded-2xl backdrop-blur-lg border border-white/20 gap-4">
               <button onClick={() => setView('menu')} className="text-white flex items-center gap-2 font-christmas text-xl hover:text-christmas-gold transition shrink-0"><ChevronLeft /> Voltar</button>
-              <h2 className="text-white font-christmas text-3xl hidden md:block">Premiações do Paar 🏆</h2>
+              
+              <div className="flex flex-col items-center gap-1 flex-1">
+                 <label className="text-[10px] font-black text-white/50 uppercase tracking-widest">Quem está votando?</label>
+                 <select 
+                   value={currentVoterId} 
+                   onChange={(e) => setCurrentVoterId(e.target.value)}
+                   className="bg-white/10 border border-white/20 text-white font-bold rounded-full px-4 py-2 outline-none focus:bg-white/20 transition cursor-pointer text-sm"
+                 >
+                   <option value="" className="text-slate-800">Selecione seu nome...</option>
+                   {participants.map(p => <option key={p.id} value={p.id} className="text-slate-800">{p.name}</option>)}
+                 </select>
+              </div>
+
               <div className="flex gap-2 shrink-0">
                 <button 
                   onClick={isAdmin ? () => setIsAddPollOpen(true) : () => setIsAdminLoginOpen(true)}
@@ -261,24 +303,40 @@ const App: React.FC = () => {
                   onClick={isAdmin ? () => setIsAdmin(false) : () => setIsAdminLoginOpen(true)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold transition shadow-lg ${isAdmin ? 'bg-red-500 text-white' : 'bg-christmas-gold text-christmas-dark'}`}
                 >
-                  {isAdmin ? <><Lock className="w-4 h-4" /> Ocultar Resultados</> : <><Unlock className="w-4 h-4" /> Ver Resultados</>}
+                  {isAdmin ? <><Lock className="w-4 h-4" /> Ocultar Placar</> : <><Unlock className="w-4 h-4" /> Ver Resultados</>}
                 </button>
               </div>
             </div>
+
+            {!currentVoterId && (
+              <div className="bg-yellow-500/20 border-2 border-yellow-500 rounded-2xl p-4 text-white text-center animate-pulse">
+                <p className="font-bold flex items-center justify-center gap-2"><HelpCircle className="w-5 h-5" /> Por favor, selecione seu nome acima para poder votar!</p>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {polls.map(poll => {
                 const options = pollOptions.filter(o => o.pollId === poll.id);
                 const totalVotes = options.reduce((sum, o) => sum + (o.votes || 0), 0);
+                const votersOfThisPoll = pollVotes.filter(v => v.pollId === poll.id);
+                const myVoteInThisPoll = votersOfThisPoll.find(v => v.participantId === currentVoterId);
                 
                 return (
                   <div key={poll.id} className="bg-white rounded-3xl overflow-hidden shadow-2xl border-b-8 border-yellow-600 flex flex-col transform hover:scale-[1.01] transition-transform">
                     <div className="bg-gradient-to-r from-yellow-600 to-yellow-700 p-5 text-white">
-                      <div className="flex items-center gap-3 mb-1">
-                        <Award className="w-6 h-6 text-yellow-200" />
-                        <h3 className="text-xl font-christmas font-bold">{poll.title}</h3>
+                      <div className="flex items-center justify-between">
+                         <div className="flex items-center gap-3">
+                            <Award className="w-6 h-6 text-yellow-200" />
+                            <h3 className="text-xl font-christmas font-bold">{poll.title}</h3>
+                         </div>
+                         {/* Fix: Lucide icons do not support 'title' prop. Wrapped in span to provide tooltip. */}
+                         {myVoteInThisPoll && (
+                           <span title="Você já votou aqui">
+                             <CheckCircle2 className="w-5 h-5 text-green-400" />
+                           </span>
+                         )}
                       </div>
-                      <p className="text-[10px] opacity-80 uppercase font-black tracking-widest">{poll.description}</p>
+                      <p className="text-[10px] opacity-80 uppercase font-black tracking-widest mt-1">{poll.description}</p>
                     </div>
                     
                     <div className="p-6 flex-1 space-y-4">
@@ -286,38 +344,47 @@ const App: React.FC = () => {
                         {options.length === 0 ? (
                           <p className="text-center text-gray-400 italic text-sm py-4">Nenhuma opção ainda...</p>
                         ) : (
-                          options.sort((a,b) => (b.votes || 0) - (a.votes || 0)).map(option => (
-                            <div key={option.id} className="group">
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="font-bold text-christmas-dark flex items-center gap-2 text-sm">
-                                  {option.name}
-                                  {isAdmin && (option.votes || 0) === Math.max(...options.map(o => o.votes || 0)) && (option.votes || 0) > 0 && (
-                                    <Trophy className="w-3 h-3 text-yellow-600 animate-bounce" />
-                                  )}
-                                </span>
-                                {isAdmin && <span className="text-xs font-black text-yellow-700">{option.votes || 0} votos</span>}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <div className="flex-1 h-8 bg-gray-100 rounded-lg overflow-hidden relative">
-                                  {isAdmin && (
-                                    <div 
-                                      className="h-full bg-yellow-400 transition-all duration-1000" 
-                                      style={{ width: `${totalVotes > 0 ? ((option.votes || 0) / totalVotes) * 100 : 0}%` }}
-                                    />
-                                  )}
+                          options.sort((a,b) => (b.votes || 0) - (a.votes || 0)).map(option => {
+                            const isMyChoice = myVoteInThisPoll?.optionId === option.id;
+                            return (
+                              <div key={option.id} className="group">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className={`font-bold text-sm flex items-center gap-2 ${isMyChoice ? 'text-green-600' : 'text-christmas-dark'}`}>
+                                    {option.name}
+                                    {isAdmin && (option.votes || 0) === Math.max(...options.map(o => o.votes || 0)) && (option.votes || 0) > 0 && (
+                                      <Trophy className="w-3 h-3 text-yellow-600 animate-bounce" />
+                                    )}
+                                    {isMyChoice && <span className="bg-green-100 text-green-600 text-[9px] px-1.5 py-0.5 rounded uppercase font-black tracking-tighter">Seu Voto</span>}
+                                  </span>
+                                  {isAdmin && <span className="text-xs font-black text-yellow-700">{option.votes || 0} votos</span>}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 h-8 bg-gray-100 rounded-lg overflow-hidden relative">
+                                    {isAdmin && (
+                                      <div 
+                                        className={`h-full transition-all duration-1000 ${isMyChoice ? 'bg-green-400' : 'bg-yellow-400'}`}
+                                        style={{ width: `${totalVotes > 0 ? ((option.votes || 0) / totalVotes) * 100 : 0}%` }}
+                                      />
+                                    )}
+                                    <button 
+                                      onClick={() => handleVoteOnPoll(poll.id, option.id)}
+                                      disabled={!!myVoteInThisPoll}
+                                      className={`absolute inset-0 w-full h-full flex items-center justify-center text-[10px] font-black uppercase transition-opacity ${myVoteInThisPoll ? 'opacity-0 cursor-not-allowed' : 'opacity-0 group-hover:opacity-100 bg-black/10 hover:bg-black/20'}`}
+                                    >
+                                      Votar em {option.name}
+                                    </button>
+                                  </div>
                                   <button 
-                                    onClick={() => handleVoteOnPoll(option.id)}
-                                    className="absolute inset-0 w-full h-full flex items-center justify-center text-[10px] font-black uppercase opacity-0 group-hover:opacity-100 bg-black/10 transition-opacity hover:bg-black/20"
+                                    onClick={() => handleVoteOnPoll(poll.id, option.id)} 
+                                    disabled={!!myVoteInThisPoll}
+                                    className={`p-2 rounded-lg transition ${isMyChoice ? 'bg-green-100 text-green-600' : myVoteInThisPoll ? 'bg-slate-50 text-slate-300' : 'bg-slate-50 hover:bg-yellow-100 text-yellow-700'}`}
                                   >
-                                    Votar em {option.name}
+                                    <ThumbsUp className="w-4 h-4" />
                                   </button>
                                 </div>
-                                <button onClick={() => handleVoteOnPoll(option.id)} className="p-2 bg-slate-50 rounded-lg hover:bg-yellow-100 text-yellow-700 transition">
-                                  <ThumbsUp className="w-4 h-4" />
-                                </button>
                               </div>
-                            </div>
-                          ))
+                            );
+                          })
                         )}
                       </div>
 
@@ -338,6 +405,25 @@ const App: React.FC = () => {
                             <Plus className="w-4 h-4" />
                           </button>
                         </div>
+                      </div>
+
+                      {/* LISTA DE QUEM VOTOU EM QUE */}
+                      <div className="pt-4 mt-2 border-t border-gray-100">
+                         <h4 className="text-[10px] font-black text-christmas-dark/40 uppercase mb-2 flex items-center gap-1">
+                           <Users className="w-3 h-3" /> Quem já votou ({votersOfThisPoll.length})
+                         </h4>
+                         <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1 custom-scrollbar">
+                            {votersOfThisPoll.length === 0 ? (
+                              <span className="text-[9px] text-slate-300 italic">Ninguém votou ainda...</span>
+                            ) : (
+                              votersOfThisPoll.map(v => (
+                                <div key={v.id} className="bg-slate-100 px-2 py-1 rounded-md border border-slate-200 flex flex-col items-start leading-tight">
+                                  <span className="text-[9px] font-bold text-slate-800">{v.participantName}</span>
+                                  <span className="text-[8px] text-slate-500">votou em {v.optionName}</span>
+                                </div>
+                              ))
+                            )}
+                         </div>
                       </div>
                     </div>
                   </div>
