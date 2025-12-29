@@ -5,7 +5,7 @@ import AddParticipantModal from './components/AddParticipantModal';
 import AddFoodModal from './components/AddFoodModal';
 import ParticipantCard from './components/ParticipantCard';
 import GiftDisplayModal from './components/GiftDisplayModal';
-import { Plus, Gift, Utensils, ChevronLeft, HelpCircle, CheckCircle2, UserCheck, Trash2, Mail, Send, Trophy, Lock, Unlock, Award, ThumbsUp, X, Save, KeyRound, Users } from 'lucide-react';
+import { Plus, Gift, Utensils, ChevronLeft, HelpCircle, CheckCircle2, UserCheck, Trash2, Mail, Send, Trophy, Lock, Unlock, Award, ThumbsUp, X, Save, KeyRound, Users, UserPlus } from 'lucide-react';
 import { 
   subscribeToParticipants, 
   saveParticipantToDb, 
@@ -54,6 +54,7 @@ const App: React.FC = () => {
   const [newPollTitle, setNewPollTitle] = useState('');
   const [newPollDesc, setNewPollDesc] = useState('');
   const [currentVoterId, setCurrentVoterId] = useState('');
+  const [guestName, setGuestName] = useState('');
 
   // Quiz States
   const [voterId, setVoterId] = useState('');
@@ -179,12 +180,29 @@ const App: React.FC = () => {
       return;
     }
 
-    const voter = participants.find(p => p.id === currentVoterId);
+    let voterName = "";
+    let voterId = "";
+
+    if (currentVoterId === "guest") {
+      if (!guestName.trim()) {
+        alert("Por favor, digite seu nome de visitante!");
+        return;
+      }
+      voterName = guestName.trim();
+      // Generate a stable guest ID based on name to track "1 vote per guest name"
+      voterId = "guest_" + voterName.toLowerCase().replace(/\s+/g, '_');
+    } else {
+      const participant = participants.find(p => p.id === currentVoterId);
+      if (!participant) return;
+      voterName = participant.name;
+      voterId = participant.id;
+    }
+
     const option = pollOptions.find(o => o.id === optionId);
-    if (!voter || !option) return;
+    if (!option) return;
 
     // Check if already voted in THIS poll
-    const existingVote = pollVotes.find(v => v.pollId === pollId && v.participantId === currentVoterId);
+    const existingVote = pollVotes.find(v => v.pollId === pollId && v.participantId === voterId);
     
     if (existingVote) {
       if (existingVote.optionId === optionId) {
@@ -192,7 +210,7 @@ const App: React.FC = () => {
         return;
       }
       
-      const confirmChange = confirm(`Peraí ${voter.name}! Você já votou em "${existingVote.optionName}". Deseja MUDAR seu voto para "${option.name}"? 🎅`);
+      const confirmChange = confirm(`Peraí ${voterName}! Você já votou em "${existingVote.optionName}". Deseja MUDAR seu voto para "${option.name}"? 🎅`);
       if (!confirmChange) return;
     }
 
@@ -200,8 +218,8 @@ const App: React.FC = () => {
       id: existingVote ? existingVote.id : crypto.randomUUID(),
       pollId: pollId,
       optionId: optionId,
-      participantId: currentVoterId,
-      participantName: voter.name,
+      participantId: voterId,
+      participantName: voterName,
       optionName: option.name
     };
 
@@ -286,16 +304,32 @@ const App: React.FC = () => {
             <div className="flex flex-col md:flex-row justify-between items-center bg-black/40 p-4 rounded-2xl backdrop-blur-lg border border-white/20 gap-4">
               <button onClick={() => setView('menu')} className="text-white flex items-center gap-2 font-christmas text-xl hover:text-christmas-gold transition shrink-0"><ChevronLeft /> Voltar</button>
               
-              <div className="flex flex-col items-center gap-1 flex-1">
+              <div className="flex flex-col items-center gap-2 flex-1 w-full max-w-md">
                  <label className="text-[10px] font-black text-white/50 uppercase tracking-widest">Quem está votando?</label>
-                 <select 
-                   value={currentVoterId} 
-                   onChange={(e) => setCurrentVoterId(e.target.value)}
-                   className="bg-white/10 border border-white/20 text-white font-bold rounded-full px-4 py-2 outline-none focus:bg-white/20 transition cursor-pointer text-sm"
-                 >
-                   <option value="" className="text-slate-800">Selecione seu nome...</option>
-                   {participants.map(p => <option key={p.id} value={p.id} className="text-slate-800">{p.name}</option>)}
-                 </select>
+                 <div className="flex flex-col sm:flex-row gap-2 w-full">
+                   <select 
+                     value={currentVoterId} 
+                     onChange={(e) => setCurrentVoterId(e.target.value)}
+                     className="bg-white/10 border border-white/20 text-white font-bold rounded-xl px-4 py-2 outline-none focus:bg-white/20 transition cursor-pointer text-sm flex-1"
+                   >
+                     <option value="" className="text-slate-800">Selecione seu nome...</option>
+                     {participants.map(p => <option key={p.id} value={p.id} className="text-slate-800">{p.name}</option>)}
+                     <option value="guest" className="text-slate-800">Sou um Convidado / Visitante 🎄</option>
+                   </select>
+
+                   {currentVoterId === "guest" && (
+                     <div className="relative flex-1 animate-in slide-in-from-top-2 duration-300">
+                       <input 
+                         type="text" 
+                         value={guestName}
+                         onChange={(e) => setGuestName(e.target.value)}
+                         placeholder="Seu Nome..."
+                         className="w-full bg-white/20 border-2 border-christmas-gold text-white font-bold rounded-xl px-4 py-2 outline-none placeholder:text-white/40 shadow-lg text-sm"
+                       />
+                       <UserPlus className="absolute right-3 top-2.5 w-4 h-4 text-christmas-gold" />
+                     </div>
+                   )}
+                 </div>
               </div>
 
               <div className="flex gap-2 shrink-0">
@@ -314,9 +348,9 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {!currentVoterId && (
+            {(!currentVoterId || (currentVoterId === "guest" && !guestName.trim())) && (
               <div className="bg-yellow-500/20 border-2 border-yellow-500 rounded-2xl p-4 text-white text-center animate-pulse">
-                <p className="font-bold flex items-center justify-center gap-2"><HelpCircle className="w-5 h-5" /> Por favor, selecione seu nome acima para poder votar!</p>
+                <p className="font-bold flex items-center justify-center gap-2"><HelpCircle className="w-5 h-5" /> Por favor, {currentVoterId === "guest" ? "insira seu nome de visitante" : "selecione seu nome"} acima para poder votar!</p>
               </div>
             )}
 
@@ -325,7 +359,10 @@ const App: React.FC = () => {
                 const options = pollOptions.filter(o => o.pollId === poll.id);
                 const totalVotes = options.reduce((sum, o) => sum + (o.votes || 0), 0);
                 const votersOfThisPoll = pollVotes.filter(v => v.pollId === poll.id);
-                const myVoteInThisPoll = votersOfThisPoll.find(v => v.participantId === currentVoterId);
+                
+                // Identify voter ID for current user to show "Your Vote"
+                const activeId = currentVoterId === "guest" ? ("guest_" + guestName.toLowerCase().replace(/\s+/g, '_')) : currentVoterId;
+                const myVoteInThisPoll = votersOfThisPoll.find(v => v.participantId === activeId);
                 
                 return (
                   <div key={poll.id} className="bg-white rounded-3xl overflow-hidden shadow-2xl border-b-8 border-yellow-600 flex flex-col transform hover:scale-[1.01] transition-transform">
@@ -420,8 +457,11 @@ const App: React.FC = () => {
                               <span className="text-[9px] text-slate-300 italic">Ninguém votou ainda...</span>
                             ) : (
                               votersOfThisPoll.map(v => (
-                                <div key={v.id} className="bg-slate-100 px-2 py-1 rounded-md border border-slate-200 flex flex-col items-start leading-tight">
-                                  <span className="text-[9px] font-bold text-slate-800">{v.participantName}</span>
+                                <div key={v.id} className={`px-2 py-1 rounded-md border flex flex-col items-start leading-tight ${v.participantId.startsWith('guest_') ? 'bg-blue-50 border-blue-100' : 'bg-slate-100 border-slate-200'}`}>
+                                  <span className="text-[9px] font-bold text-slate-800 flex items-center gap-1">
+                                    {v.participantName}
+                                    {v.participantId.startsWith('guest_') && <span className="text-[7px] bg-blue-500 text-white px-1 rounded">Vis</span>}
+                                  </span>
                                   <span className="text-[8px] text-slate-500">votou em {v.optionName}</span>
                                 </div>
                               ))
