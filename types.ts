@@ -39,4 +39,17 @@ export interface SecretMessage {
   createdAt: number;
 }
 
+export interface Poll {
+  id: string;
+  title: string;
+  description: string;
+}
+
+export interface PollOption {
+  id: string;
+  pollId: string;
+  name: string;
+  votes: number;
+}
+
 export type GiftSuggestion = Omit<Gift, 'id' | 'image'> & { imagePrompt: string };

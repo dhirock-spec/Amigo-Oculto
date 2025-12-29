@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Participant, FoodItem, Vote, SecretMessage } from './types';
+import { Participant, FoodItem, Vote, SecretMessage, Poll, PollOption } from './types';
 import Snowfall from './components/Snowfall';
 import AddParticipantModal from './components/AddParticipantModal';
 import AddFoodModal from './components/AddFoodModal';
 import ParticipantCard from './components/ParticipantCard';
 import GiftDisplayModal from './components/GiftDisplayModal';
-import { Plus, Gift, Utensils, ChevronLeft, Pencil, Sparkles, HelpCircle, CheckCircle2, UserCheck, AlertCircle, Trash2, Mail, Send, User } from 'lucide-react';
+import { Plus, Gift, Utensils, ChevronLeft, HelpCircle, CheckCircle2, UserCheck, Trash2, Mail, Send, Trophy, Lock, Unlock, Award, ThumbsUp, X, Save, KeyRound } from 'lucide-react';
 import { 
   subscribeToParticipants, 
   saveParticipantToDb, 
@@ -17,10 +17,15 @@ import {
   subscribeToMessages,
   saveMessageToDb,
   deleteMessageFromDb,
+  subscribeToPolls,
+  savePollToDb,
+  subscribeToPollOptions,
+  savePollOptionToDb,
+  voteOnOptionInDb,
   isFirebaseConfigured 
 } from './services/firebase';
 
-type ViewMode = 'menu' | 'gifts' | 'food' | 'quiz' | 'messages';
+type ViewMode = 'menu' | 'gifts' | 'food' | 'quiz' | 'messages' | 'awards';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewMode>('menu');
@@ -28,13 +33,24 @@ const App: React.FC = () => {
   const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
   const [messages, setMessages] = useState<SecretMessage[]>([]);
+  const [polls, setPolls] = useState<Poll[]>([]);
+  const [pollOptions, setPollOptions] = useState<PollOption[]>([]);
   
   const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
   const [isAddFoodOpen, setIsAddFoodOpen] = useState(false);
+  const [isAddPollOpen, setIsAddPollOpen] = useState(false);
+  const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
   
   const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null);
   const [editingParticipant, setEditingParticipant] = useState<Participant | undefined>(undefined);
   const [editingFood, setEditingFood] = useState<FoodItem | undefined>(undefined);
+
+  // Awards/Polls States
+  const [newOptionName, setNewOptionName] = useState<{ [pollId: string]: string }>({});
+  const [newPollTitle, setNewPollTitle] = useState('');
+  const [newPollDesc, setNewPollDesc] = useState('');
 
   // Quiz States
   const [voterId, setVoterId] = useState('');
@@ -52,11 +68,16 @@ const App: React.FC = () => {
     const unsubFood = subscribeToFood(setFoodItems);
     const unsubVotes = subscribeToVotes(setVotes);
     const unsubMessages = subscribeToMessages(setMessages);
+    const unsubPolls = subscribeToPolls(setPolls);
+    const unsubOptions = subscribeToPollOptions(setPollOptions);
+    
     return () => {
       unsubParticipants();
       unsubFood();
       unsubVotes();
       unsubMessages();
+      unsubPolls();
+      unsubOptions();
     };
   }, []);
 
@@ -79,7 +100,7 @@ const App: React.FC = () => {
     const newMessage: SecretMessage = {
       id: crypto.randomUUID(),
       senderName: msgSenderName.trim() || 'Anônimo 🎅',
-      recipientId: '', // Livre, sem ID fixo
+      recipientId: '', 
       recipientName: msgRecipientName.trim(),
       content: msgContent,
       createdAt: Date.now()
@@ -117,25 +138,52 @@ const App: React.FC = () => {
     setGuessId('');
   };
 
-  const handleEditVote = (vote: Vote) => {
-    setVoterId(vote.id);
-    setGuessId(vote.guessId);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const handleAddPollOption = async (pollId: string) => {
+    const name = newOptionName[pollId];
+    if (!name || !name.trim()) return;
+
+    const newOption: PollOption = {
+      id: crypto.randomUUID(),
+      pollId: pollId,
+      name: name.trim(),
+      votes: 0
+    };
+
+    await savePollOptionToDb(newOption);
+    setNewOptionName(prev => ({ ...prev, [pollId]: '' }));
   };
 
-  const handleDeleteVote = async (voteId: string) => {
-    if (confirm('Tem certeza que deseja excluir seu palpite?')) {
-      await deleteVoteFromDb(voteId);
-      if (voterId === voteId) {
-        setVoterId('');
-        setGuessId('');
-      }
+  const handleCreatePoll = async () => {
+    if (!newPollTitle.trim()) return;
+    
+    const newPoll: Poll = {
+      id: crypto.randomUUID(),
+      title: newPollTitle.trim(),
+      description: newPollDesc.trim() || 'Quem merece esse título?'
+    };
+
+    await savePollToDb(newPoll);
+    setIsAddPollOpen(false);
+    setNewPollTitle('');
+    setNewPollDesc('');
+  };
+
+  const handleVoteOnPoll = async (optionId: string) => {
+    await voteOnOptionInDb(optionId);
+  };
+
+  const handleAdminLogin = () => {
+    if (adminPassword === "1181") {
+      setIsAdmin(true);
+      setIsAdminLoginOpen(false);
+      setAdminPassword('');
+    } else {
+      alert("Código incorreto!");
+      setAdminPassword('');
     }
   };
 
   const activeParticipant = participants.find(p => p.id === selectedParticipantId) || null;
-  const hasVoted = (id: string) => votes.some(v => v.id === id);
-  const existingVote = votes.find(v => v.id === voterId);
 
   return (
     <div className="min-h-screen bg-[url('https://images.unsplash.com/photo-1534796636912-3b95b3ab5980?auto=format&fit=crop&q=80')] bg-cover bg-center bg-fixed text-slate-800 font-sans relative overflow-x-hidden">
@@ -153,7 +201,7 @@ const App: React.FC = () => {
       <main className="relative z-10 max-w-7xl mx-auto px-4 pb-20">
         
         {view === 'menu' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-12 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-12 max-w-6xl mx-auto">
             <button onClick={() => setView('gifts')} className="flex-1 bg-christmas-red hover:bg-red-700 text-white p-8 rounded-3xl shadow-2xl border-4 border-christmas-gold transform hover:-translate-y-2 transition-all flex flex-col items-center gap-6 group">
               <div className="bg-white/20 p-6 rounded-full group-hover:scale-110 transition"><Gift className="w-12 h-12 text-christmas-gold" /></div>
               <div className="text-center">
@@ -178,6 +226,14 @@ const App: React.FC = () => {
               </div>
             </button>
 
+            <button onClick={() => setView('awards')} className="flex-1 bg-gradient-to-br from-yellow-600 to-yellow-800 hover:from-yellow-500 hover:to-yellow-700 text-white p-8 rounded-3xl shadow-2xl border-4 border-christmas-gold transform hover:-translate-y-2 transition-all flex flex-col items-center gap-6 group">
+              <div className="bg-white/20 p-6 rounded-full group-hover:scale-110 transition"><Trophy className="w-12 h-12 text-white" /></div>
+              <div className="text-center">
+                <h2 className="text-2xl font-christmas font-bold mb-2">Premiações</h2>
+                <p className="opacity-80 text-xs">As melhores enquetes do Natal!</p>
+              </div>
+            </button>
+
             <button onClick={() => setView('quiz')} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-8 rounded-3xl shadow-2xl border-4 border-christmas-gold transform hover:-translate-y-2 transition-all flex flex-col items-center gap-6 group">
               <div className="bg-white/20 p-6 rounded-full group-hover:scale-110 transition"><HelpCircle className="w-12 h-12 text-christmas-gold" /></div>
               <div className="text-center">
@@ -188,6 +244,182 @@ const App: React.FC = () => {
           </div>
         )}
 
+        {/* PREMIAÇÕES / ENQUETES */}
+        {view === 'awards' && (
+          <div className="space-y-8 animate-in fade-in duration-500 max-w-6xl mx-auto">
+            <div className="flex flex-col md:flex-row justify-between items-center bg-black/40 p-4 rounded-2xl backdrop-blur-lg border border-white/20 gap-4">
+              <button onClick={() => setView('menu')} className="text-white flex items-center gap-2 font-christmas text-xl hover:text-christmas-gold transition shrink-0"><ChevronLeft /> Voltar</button>
+              <h2 className="text-white font-christmas text-3xl hidden md:block">Premiações do Paar 🏆</h2>
+              <div className="flex gap-2 shrink-0">
+                <button 
+                  onClick={isAdmin ? () => setIsAddPollOpen(true) : () => setIsAdminLoginOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full font-bold transition shadow-lg bg-white text-christmas-dark border-2 border-christmas-gold hover:scale-105"
+                >
+                  <Plus className="w-4 h-4" /> Nova Categoria
+                </button>
+                <button 
+                  onClick={isAdmin ? () => setIsAdmin(false) : () => setIsAdminLoginOpen(true)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold transition shadow-lg ${isAdmin ? 'bg-red-500 text-white' : 'bg-christmas-gold text-christmas-dark'}`}
+                >
+                  {isAdmin ? <><Lock className="w-4 h-4" /> Ocultar Resultados</> : <><Unlock className="w-4 h-4" /> Ver Resultados</>}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {polls.map(poll => {
+                const options = pollOptions.filter(o => o.pollId === poll.id);
+                const totalVotes = options.reduce((sum, o) => sum + (o.votes || 0), 0);
+                
+                return (
+                  <div key={poll.id} className="bg-white rounded-3xl overflow-hidden shadow-2xl border-b-8 border-yellow-600 flex flex-col transform hover:scale-[1.01] transition-transform">
+                    <div className="bg-gradient-to-r from-yellow-600 to-yellow-700 p-5 text-white">
+                      <div className="flex items-center gap-3 mb-1">
+                        <Award className="w-6 h-6 text-yellow-200" />
+                        <h3 className="text-xl font-christmas font-bold">{poll.title}</h3>
+                      </div>
+                      <p className="text-[10px] opacity-80 uppercase font-black tracking-widest">{poll.description}</p>
+                    </div>
+                    
+                    <div className="p-6 flex-1 space-y-4">
+                      <div className="space-y-3">
+                        {options.length === 0 ? (
+                          <p className="text-center text-gray-400 italic text-sm py-4">Nenhuma opção ainda...</p>
+                        ) : (
+                          options.sort((a,b) => (b.votes || 0) - (a.votes || 0)).map(option => (
+                            <div key={option.id} className="group">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-bold text-christmas-dark flex items-center gap-2 text-sm">
+                                  {option.name}
+                                  {isAdmin && (option.votes || 0) === Math.max(...options.map(o => o.votes || 0)) && (option.votes || 0) > 0 && (
+                                    <Trophy className="w-3 h-3 text-yellow-600 animate-bounce" />
+                                  )}
+                                </span>
+                                {isAdmin && <span className="text-xs font-black text-yellow-700">{option.votes || 0} votos</span>}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 h-8 bg-gray-100 rounded-lg overflow-hidden relative">
+                                  {isAdmin && (
+                                    <div 
+                                      className="h-full bg-yellow-400 transition-all duration-1000" 
+                                      style={{ width: `${totalVotes > 0 ? ((option.votes || 0) / totalVotes) * 100 : 0}%` }}
+                                    />
+                                  )}
+                                  <button 
+                                    onClick={() => handleVoteOnPoll(option.id)}
+                                    className="absolute inset-0 w-full h-full flex items-center justify-center text-[10px] font-black uppercase opacity-0 group-hover:opacity-100 bg-black/10 transition-opacity hover:bg-black/20"
+                                  >
+                                    Votar em {option.name}
+                                  </button>
+                                </div>
+                                <button onClick={() => handleVoteOnPoll(option.id)} className="p-2 bg-slate-50 rounded-lg hover:bg-yellow-100 text-yellow-700 transition">
+                                  <ThumbsUp className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      <div className="pt-4 border-t border-gray-100">
+                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Sugerir Opção</label>
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            value={newOptionName[poll.id] || ''}
+                            onChange={(e) => setNewOptionName(prev => ({ ...prev, [poll.id]: e.target.value }))}
+                            placeholder="Nome de alguém..." 
+                            className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:border-yellow-600"
+                          />
+                          <button 
+                            onClick={() => handleAddPollOption(poll.id)}
+                            className="p-2 bg-yellow-600 text-white rounded-xl hover:bg-yellow-700 transition shadow-md"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* MODAL ADMIN LOGIN */}
+        {isAdminLoginOpen && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+            <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden border-4 border-christmas-gold animate-in zoom-in duration-200">
+              <div className="bg-christmas-red p-5 flex justify-between items-center text-white">
+                <h3 className="text-xl font-christmas font-bold flex items-center gap-2"><KeyRound className="w-5 h-5" /> Acesso Restrito</h3>
+                <button onClick={() => setIsAdminLoginOpen(false)} className="hover:bg-white/20 p-2 rounded-full"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="p-8 space-y-6">
+                <p className="text-center text-gray-600 font-medium text-sm">Digite o código de acesso para ver resultados ou gerenciar categorias.</p>
+                <div>
+                  <input 
+                    type="password" 
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAdminLogin()}
+                    placeholder="Código (1181)" 
+                    className="w-full px-4 py-4 bg-slate-50 border-2 border-gray-100 rounded-2xl font-black text-2xl tracking-[1em] text-center outline-none focus:border-christmas-gold focus:bg-white transition-all"
+                  />
+                </div>
+                <button 
+                  onClick={handleAdminLogin}
+                  className="w-full py-4 bg-christmas-green hover:bg-green-800 text-white font-black text-lg rounded-2xl shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <Unlock className="w-5 h-5" /> Liberar Acesso
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL ADICIONAR ENQUETE (CATEGORIA) */}
+        {isAddPollOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border-4 border-christmas-gold animate-in zoom-in duration-200">
+              <div className="bg-yellow-600 p-5 flex justify-between items-center text-white">
+                <h3 className="text-xl font-christmas font-bold flex items-center gap-2"><Trophy className="w-5 h-5" /> Nova Categoria</h3>
+                <button onClick={() => setIsAddPollOpen(false)} className="hover:bg-white/20 p-2 rounded-full"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="text-[10px] font-black text-yellow-600 uppercase tracking-widest block mb-1">Título da Premiação</label>
+                  <input 
+                    type="text" 
+                    value={newPollTitle}
+                    onChange={(e) => setNewPollTitle(e.target.value)}
+                    placeholder="Ex: O mais dorminhoco" 
+                    className="w-full px-4 py-3 bg-slate-50 border-2 border-gray-100 rounded-xl font-bold outline-none focus:border-yellow-600"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-yellow-600 uppercase tracking-widest block mb-1">Descrição</label>
+                  <input 
+                    type="text" 
+                    value={newPollDesc}
+                    onChange={(e) => setNewPollDesc(e.target.value)}
+                    placeholder="Ex: Quem sempre dorme no sofá do Paar?" 
+                    className="w-full px-4 py-3 bg-slate-50 border-2 border-gray-100 rounded-xl font-bold outline-none focus:border-yellow-600"
+                  />
+                </div>
+                <button 
+                  onClick={handleCreatePoll}
+                  disabled={!newPollTitle.trim()}
+                  className="w-full py-4 bg-yellow-600 hover:bg-yellow-700 text-white font-black text-lg rounded-2xl shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <Save className="w-5 h-5" /> Criar Categoria
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CORREIO SECRETO */}
         {view === 'messages' && (
           <div className="space-y-8 animate-in fade-in duration-500 max-w-5xl mx-auto">
             <div className="flex justify-between items-center bg-black/40 p-4 rounded-2xl backdrop-blur-lg border border-white/20">

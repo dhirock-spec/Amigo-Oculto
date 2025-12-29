@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
-import { Participant, FoodItem, Vote, SecretMessage } from '../types';
+import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, query, orderBy, updateDoc, increment } from 'firebase/firestore';
+import { Participant, FoodItem, Vote, SecretMessage, Poll, PollOption } from '../types';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA3pGzzEQvnasDlDSmsOnKrIEDXJfZ2WCc",
@@ -177,5 +177,87 @@ export const deleteVoteFromDb = async (voteId: string) => {
     return true;
   }
   await deleteDoc(doc(db, "votes", voteId));
+  return true;
+};
+
+// --- ENQUETES (POLLS) ---
+export const subscribeToPolls = (callback: (data: Poll[]) => void) => {
+  if (!db) {
+    const loadFromLocal = () => {
+      const stored = localStorage.getItem('paar_polls');
+      callback(stored ? JSON.parse(stored) : [
+        { id: 'animado', title: 'O mais animado do grupo', description: 'Quem não para de falar no grupo?' },
+        { id: 'sumido', title: 'O mais sumido/low profile', description: 'Quem só aparece para confirmar presença?' },
+        { id: 'atrasado', title: 'O rei/rainha do atraso', description: 'Quem sempre chega "daqui a 5 minutos"?' },
+        { id: 'brocado', title: 'Brocado do ano', description: 'Quem é o maior comedor/comilona da galera?' }
+      ]);
+    };
+    loadFromLocal();
+    window.addEventListener('storage', loadFromLocal);
+    return () => window.removeEventListener('storage', loadFromLocal);
+  }
+
+  return onSnapshot(collection(db, "polls"), (snapshot) => {
+    const polls = snapshot.docs.map(doc => doc.data() as Poll);
+    callback(polls);
+  });
+};
+
+export const savePollToDb = async (poll: Poll) => {
+  if (!db) {
+    const stored = localStorage.getItem('paar_polls');
+    const polls = stored ? JSON.parse(stored) : [];
+    localStorage.setItem('paar_polls', JSON.stringify([...polls, poll]));
+    window.dispatchEvent(new Event('storage'));
+    return true;
+  }
+  await setDoc(doc(db, "polls", poll.id), poll);
+  return true;
+};
+
+export const subscribeToPollOptions = (callback: (data: PollOption[]) => void) => {
+  if (!db) {
+    const loadFromLocal = () => {
+      const stored = localStorage.getItem('paar_poll_options');
+      callback(stored ? JSON.parse(stored) : []);
+    };
+    loadFromLocal();
+    window.addEventListener('storage', loadFromLocal);
+    return () => window.removeEventListener('storage', loadFromLocal);
+  }
+
+  return onSnapshot(collection(db, "pollOptions"), (snapshot) => {
+    const options = snapshot.docs.map(doc => doc.data() as PollOption);
+    callback(options);
+  });
+};
+
+export const savePollOptionToDb = async (option: PollOption) => {
+  if (!db) {
+    const stored = localStorage.getItem('paar_poll_options');
+    const options = stored ? JSON.parse(stored) : [];
+    localStorage.setItem('paar_poll_options', JSON.stringify([...options, option]));
+    window.dispatchEvent(new Event('storage'));
+    return true;
+  }
+  await setDoc(doc(db, "pollOptions", option.id), option);
+  return true;
+};
+
+export const voteOnOptionInDb = async (optionId: string) => {
+  if (!db) {
+    const stored = localStorage.getItem('paar_poll_options');
+    let options = stored ? JSON.parse(stored) : [];
+    const index = options.findIndex((o: PollOption) => o.id === optionId);
+    if (index >= 0) {
+      options[index].votes = (options[index].votes || 0) + 1;
+      localStorage.setItem('paar_poll_options', JSON.stringify(options));
+      window.dispatchEvent(new Event('storage'));
+    }
+    return true;
+  }
+  await updateDoc(doc(db, "pollOptions", optionId), {
+    votes: increment(1)
+  });
   return true;
 };
